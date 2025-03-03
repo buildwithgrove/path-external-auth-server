@@ -18,7 +18,8 @@ It uses gRPC and adheres to the spec expected by Envoy Proxy's `ext_authz` HTTP 
   <a href="https://www.envoyproxy.io/docs/envoy/latest/">
     <img src="https://www.envoyproxy.io/docs/envoy/latest/_static/envoy-logo.png" alt="Envoy logo" width="200"/>
   </a>
-See the <a href="https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter">Envoy Proxy External Authorization docs</a> for more information.
+  <br/>
+  <div>See the <a href="https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter">Envoy Proxy External Authorization docs</a> for more information.</div>
 </div>
 
 
