@@ -1,0 +1,59 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Don't commit binaries
+bin
+
+# Do not allow a multi-moduled projected
+go.work.sum
+
+# Config
+.*.yaml
+.config.yaml
+.config.*.yaml
+!.config.example.yaml
+!.config.shannon_example.yaml
+!.config.morse_example.yaml
+!.config.morse_example_testnet.yaml
+# Morse E2E config
+.morse.config.yaml
+# Shannon E2E config
+.shannon.config.yaml
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Macos
+.DS_Store
+**/.DS_Store
+
+# Development
+.vscode
+.idea/
+.mise.local.toml
+
+# tmp directory
+tmp
+tmp/*
+
+# PATH artifacts
+install.log
+local/path/
+
+# Claudesync
+.claudesync/
+
+# Config Backup files
+*.backup
