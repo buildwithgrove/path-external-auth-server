@@ -17,19 +17,6 @@ bin
 # Do not allow a multi-moduled projected
 go.work.sum
 
-# Config
-.*.yaml
-.config.yaml
-.config.*.yaml
-!.config.example.yaml
-!.config.shannon_example.yaml
-!.config.morse_example.yaml
-!.config.morse_example_testnet.yaml
-# Morse E2E config
-.morse.config.yaml
-# Shannon E2E config
-.shannon.config.yaml
-
 # Env
 .env
 .env.*

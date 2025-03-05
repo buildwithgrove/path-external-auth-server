@@ -51,9 +51,6 @@ type AuthHandler struct {
 	// The authorizers to be used for the request
 	APIKeyAuthorizer Authorizer
 	JWTAuthorizer    Authorizer
-
-	// The endpoint ID extractor to be used for the request
-	EndpointIDExtractor EndpointIDExtractor
 }
 
 // Check satisfies the implementation of the Envoy External Authorization gRPC service.
@@ -87,7 +84,7 @@ func (a *AuthHandler) Check(
 
 	// Extract the endpoint ID from the request
 	// It may be extracted from the URL path or the headers
-	endpointID, err := a.EndpointIDExtractor.extractGatewayEndpointID(req)
+	endpointID, err := extractEndpointID(req)
 	if err != nil {
 		a.Logger.Info().Err(err).Msg("unable to extract endpoint ID from request")
 		return getDeniedCheckResponse(err.Error(), envoy_type.StatusCode_BadRequest), nil

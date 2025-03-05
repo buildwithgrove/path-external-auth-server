@@ -19,12 +19,11 @@ import (
 
 func Test_Check(t *testing.T) {
 	tests := []struct {
-		name                string
-		checkReq            *envoy_auth.CheckRequest
-		expectedResp        *envoy_auth.CheckResponse
-		endpointID          string
-		endpointIDExtractor EndpointIDExtractor
-		mockEndpointReturn  *proto.GatewayEndpoint
+		name               string
+		checkReq           *envoy_auth.CheckRequest
+		expectedResp       *envoy_auth.CheckResponse
+		endpointID         string
+		mockEndpointReturn *proto.GatewayEndpoint
 	}{
 		{
 			name: "should return OK check response if check request is valid and user is authorized to access endpoint with rate limit headers set",
@@ -55,8 +54,7 @@ func Test_Check(t *testing.T) {
 					},
 				},
 			},
-			endpointIDExtractor: &URLPathExtractor{},
-			endpointID:          "endpoint_free",
+			endpointID: "endpoint_free",
 			mockEndpointReturn: &proto.GatewayEndpoint{
 				EndpointId: "endpoint_free",
 				Auth: &proto.Auth{
@@ -104,8 +102,7 @@ func Test_Check(t *testing.T) {
 					},
 				},
 			},
-			endpointIDExtractor: &URLPathExtractor{},
-			endpointID:          "endpoint_unlimited",
+			endpointID: "endpoint_unlimited",
 			mockEndpointReturn: &proto.GatewayEndpoint{
 				EndpointId: "endpoint_unlimited",
 				Auth: &proto.Auth{
@@ -150,8 +147,7 @@ func Test_Check(t *testing.T) {
 					},
 				},
 			},
-			endpointIDExtractor: &URLPathExtractor{},
-			endpointID:          "api_key_endpoint",
+			endpointID: "api_key_endpoint",
 			mockEndpointReturn: &proto.GatewayEndpoint{
 				EndpointId: "api_key_endpoint",
 				Auth: &proto.Auth{
@@ -190,8 +186,7 @@ func Test_Check(t *testing.T) {
 					},
 				},
 			},
-			endpointIDExtractor: &URLPathExtractor{},
-			endpointID:          "jwt_endpoint",
+			endpointID: "jwt_endpoint",
 			mockEndpointReturn: &proto.GatewayEndpoint{
 				EndpointId: "jwt_endpoint",
 				Auth: &proto.Auth{
@@ -232,8 +227,7 @@ func Test_Check(t *testing.T) {
 					},
 				},
 			},
-			endpointIDExtractor: &URLPathExtractor{},
-			endpointID:          "public_endpoint",
+			endpointID: "public_endpoint",
 			mockEndpointReturn: &proto.GatewayEndpoint{
 				EndpointId: "public_endpoint",
 				Auth: &proto.Auth{
@@ -270,8 +264,7 @@ func Test_Check(t *testing.T) {
 					},
 				},
 			},
-			endpointIDExtractor: &HeaderExtractor{},
-			endpointID:          "endpoint_id_from_header",
+			endpointID: "endpoint_id_from_header",
 			mockEndpointReturn: &proto.GatewayEndpoint{
 				EndpointId: "endpoint_id_from_header",
 				Auth: &proto.Auth{
@@ -309,9 +302,8 @@ func Test_Check(t *testing.T) {
 					},
 				},
 			},
-			endpointIDExtractor: &URLPathExtractor{},
-			endpointID:          "endpoint_not_found",
-			mockEndpointReturn:  &proto.GatewayEndpoint{},
+			endpointID:         "endpoint_not_found",
+			mockEndpointReturn: &proto.GatewayEndpoint{},
 		},
 		{
 			name: "should return denied check response if user is not authorized to access endpoint using API key auth",
@@ -341,8 +333,7 @@ func Test_Check(t *testing.T) {
 					},
 				},
 			},
-			endpointIDExtractor: &URLPathExtractor{},
-			endpointID:          "endpoint_api_key",
+			endpointID: "endpoint_api_key",
 			mockEndpointReturn: &proto.GatewayEndpoint{
 				EndpointId: "endpoint_api_key",
 				Auth: &proto.Auth{
@@ -382,8 +373,7 @@ func Test_Check(t *testing.T) {
 					},
 				},
 			},
-			endpointIDExtractor: &URLPathExtractor{},
-			endpointID:          "endpoint_jwt_auth",
+			endpointID: "endpoint_jwt_auth",
 			mockEndpointReturn: &proto.GatewayEndpoint{
 				EndpointId: "endpoint_jwt_auth",
 				Auth: &proto.Auth{
@@ -414,10 +404,9 @@ func Test_Check(t *testing.T) {
 			authHandler := &AuthHandler{
 				Logger: polyzero.NewLogger(),
 
-				EndpointStore:       mockStore,
-				APIKeyAuthorizer:    &APIKeyAuthorizer{},
-				JWTAuthorizer:       &JWTAuthorizer{},
-				EndpointIDExtractor: test.endpointIDExtractor,
+				EndpointStore:    mockStore,
+				APIKeyAuthorizer: &APIKeyAuthorizer{},
+				JWTAuthorizer:    &JWTAuthorizer{},
 			}
 
 			resp, err := authHandler.Check(context.Background(), test.checkReq)
