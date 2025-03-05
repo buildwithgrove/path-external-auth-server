@@ -5,20 +5,15 @@ import (
 	"os"
 	"regexp"
 	"strconv"
-
-	"github.com/buildwithgrove/path-external-auth-server/auth"
 )
 
 const (
 	grpcHostPortEnv               = "GRPC_HOST_PORT"
 	grpcUseInsecureCredentialsEnv = "GRPC_USE_INSECURE_CREDENTIALS"
-	epIDExtractorTypeEnv          = "ENDPOINT_ID_EXTRACTOR_TYPE"
 	portEnv                       = "PORT"
-
-	defaultPort = 10001
+	defaultPort                   = 10001
 )
 
-var defaultEndpointIDExtractorType = auth.EndpointIDExtractorTypeURLPath
 var grpcHostPortPattern = "^[^:]+:[0-9]+$"
 
 // envVars holds configuration values, all fields are private
@@ -27,7 +22,6 @@ var grpcHostPortPattern = "^[^:]+:[0-9]+$"
 type envVars struct {
 	grpcHostPort               string
 	grpcUseInsecureCredentials bool
-	epIDExtractorType          auth.EndpointIDExtractorType
 	port                       int
 }
 
@@ -35,8 +29,7 @@ type envVars struct {
 // and validates/hydrates defaults for missing/invalid values.
 func gatherEnvVars() (envVars, error) {
 	e := envVars{
-		grpcHostPort:      os.Getenv(grpcHostPortEnv),
-		epIDExtractorType: auth.EndpointIDExtractorType(os.Getenv(epIDExtractorTypeEnv)),
+		grpcHostPort: os.Getenv(grpcHostPortEnv),
 	}
 
 	portStr := os.Getenv(portEnv)
@@ -57,14 +50,17 @@ func gatherEnvVars() (envVars, error) {
 		e.grpcUseInsecureCredentials = insecure
 	}
 
-	if err := e.validateAndHydrate(); err != nil {
+	e.hydrateDefaults()
+
+	if err := e.validate(); err != nil {
 		return envVars{}, err
 	}
 
 	return e, nil
 }
 
-func (e *envVars) validateAndHydrate() error {
+// validate validates the environment variables
+func (e *envVars) validate() error {
 	if e.grpcHostPort == "" {
 		return fmt.Errorf("%s is not set", grpcHostPortEnv)
 	}
@@ -75,13 +71,12 @@ func (e *envVars) validateAndHydrate() error {
 	if !matched {
 		return fmt.Errorf("grpcHostPort does not match the required pattern")
 	}
+	return nil
+}
 
-	if !e.epIDExtractorType.IsValid() {
-		fmt.Printf("invalid endpoint ID extractor type: %s, using default: %s\n", e.epIDExtractorType, defaultEndpointIDExtractorType)
-		e.epIDExtractorType = defaultEndpointIDExtractorType
-	}
+// hydrateDefaults hydrates defaults for missing/invalid values.
+func (e *envVars) hydrateDefaults() {
 	if e.port == 0 {
 		e.port = defaultPort
 	}
-	return nil
 }

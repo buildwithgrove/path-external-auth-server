@@ -18,10 +18,6 @@ import (
 	"github.com/buildwithgrove/path-external-auth-server/proto"
 )
 
-// defaultConfigPath will be appended to the location of
-// the executable to get the full path to the config file.
-const defaultConfigPath = "config/.config.yaml"
-
 func main() {
 	// Initialize new polylog logger
 	logger := polyzero.NewLogger()
@@ -55,18 +51,13 @@ func main() {
 		panic(err)
 	}
 
-	// Determine which gateway endpoint ID extractor to use
-	// If the extractor is not set in the config, the default "url_path" extractor is used
-	endpointIDExtractor := getEndpointIDExtractor(env.epIDExtractorType)
-
 	// Create a new AuthHandler to handle the request auth
 	authHandler := &auth.AuthHandler{
 		Logger: logger,
 
-		EndpointStore:       endpointStore,
-		APIKeyAuthorizer:    &auth.APIKeyAuthorizer{},
-		JWTAuthorizer:       &auth.JWTAuthorizer{},
-		EndpointIDExtractor: endpointIDExtractor,
+		EndpointStore:    endpointStore,
+		APIKeyAuthorizer: &auth.APIKeyAuthorizer{},
+		JWTAuthorizer:    &auth.JWTAuthorizer{},
 	}
 
 	// Create a new gRPC server for handling auth requests from Envoy
@@ -93,16 +84,4 @@ func connectGRPC(hostPort string, useInsecureCredentials bool) (*grpc.ClientConn
 		creds = credentials.NewTLS(&tls.Config{})
 	}
 	return grpc.NewClient(hostPort, grpc.WithTransportCredentials(creds))
-}
-
-// getEndpointIDExtractor returns the endpoint ID extractor based on the config YAML.
-func getEndpointIDExtractor(endpointIDExtractorType auth.EndpointIDExtractorType) auth.EndpointIDExtractor {
-	switch endpointIDExtractorType {
-	case auth.EndpointIDExtractorTypeURLPath:
-		return &auth.URLPathExtractor{}
-	case auth.EndpointIDExtractorTypeHeader:
-		return &auth.HeaderExtractor{}
-	default: // this should never happen
-		panic(fmt.Sprintf("invalid endpoint ID extractor type: %v", endpointIDExtractorType))
-	}
 }
