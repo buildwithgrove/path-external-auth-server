@@ -8,7 +8,8 @@ import (
 )
 
 // extractEndpointID extracts the endpoint ID from the HTTP request.
-// It first attempts to extract the ID from the header, and if that fails, it falls back to the URL path.
+// It first attempts to extract the ID from the header.
+// If the above fails, it falls back to the URL path.
 // If both extraction methods fail, it returns an error.
 func extractEndpointID(req *envoy_auth.AttributeContext_HttpRequest) (string, error) {
 	if id := extractFromHeader(req); id != "" {
