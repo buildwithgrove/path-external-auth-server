@@ -79,8 +79,6 @@ message Auth {
     NoAuth no_auth = 1;
     // Indicates that the GatewayEndpoint uses a static API key for authorization.
     StaticAPIKey static_api_key = 2;
-    // Indicates that the GatewayEndpoint uses an auth provider issued JWT for authorization.
-    JWT jwt = 3;
   }
 }
 
@@ -91,13 +89,6 @@ message NoAuth {}
 message StaticAPIKey {
   // The API key to use for authorization.
   string api_key = 1;
-}
-
-// JWT is the JSON Web Token authorization settings for a GatewayEndpoint.
-message JWT {
-  // A map of user IDs authorized to access this UserAccount's GatewayEndpoints.
-  // For example, if the auth provider is Auth0, the user ID will be in the format `auth0|1234567890`.
-  map<string, Empty> authorized_users = 2;
 }
 
 // The rate limiting settings for a GatewayEndpoint.

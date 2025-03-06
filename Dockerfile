@@ -13,17 +13,13 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN go build -o /go/bin/auth-server ./main.go
+RUN go build -o /go/bin/auth-server .
 
 FROM alpine:3.19
 WORKDIR /app
 
 ARG IMAGE_TAG
 ENV IMAGE_TAG=${IMAGE_TAG}
-ENV CONFIG_PATH=/app/config/.config.yaml
-
-# Create config directory
-RUN mkdir -p /app/config
 
 COPY --from=builder /go/bin/auth-server ./
 

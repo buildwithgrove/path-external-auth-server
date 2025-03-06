@@ -7,7 +7,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.4.0
 // - protoc             v5.28.3
-// source: envoy/auth_server/proto/gateway_endpoint.proto
+// source: proto/gateway_endpoint.proto
 
 package proto
 
@@ -187,5 +187,5 @@ var GatewayEndpoints_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "envoy/auth_server/proto/gateway_endpoint.proto",
+	Metadata: "proto/gateway_endpoint.proto",
 }
