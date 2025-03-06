@@ -26,3 +26,14 @@ test_all_verbose: ## Runs all tests with verbose output enabled
 .PHONY: test_unit
 test_unit: ## Runs unit tests only (excludes Postgres Docker integration tests)
 	go test ./... -short -count=1
+
+#######################
+### Proto  Helpers ####
+#######################
+
+.PHONY: proto_gen_envoy
+proto_gen_envoy: ## Generate envoy protobuf artifacts
+	protoc \
+		--go_out=./proto \
+		--go-grpc_out=./proto \
+		proto/gateway_endpoint.proto

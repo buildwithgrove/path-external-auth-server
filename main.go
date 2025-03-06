@@ -45,7 +45,7 @@ func main() {
 		panic(err)
 	}
 
-	// Create a new listener to listen for requests from Envoy
+	// Create a new listener to listen for requests from GUARD
 	listen, err := net.Listen("tcp", fmt.Sprintf(":%d", env.port))
 	if err != nil {
 		panic(err)
@@ -57,13 +57,12 @@ func main() {
 
 		EndpointStore:    endpointStore,
 		APIKeyAuthorizer: &auth.APIKeyAuthorizer{},
-		JWTAuthorizer:    &auth.JWTAuthorizer{},
 	}
 
-	// Create a new gRPC server for handling auth requests from Envoy
+	// Create a new gRPC server for handling auth requests from GUARD
 	grpcServer := grpc.NewServer()
 
-	// Register envoy proto server
+	// Register proto server
 	envoy_auth.RegisterAuthorizationServer(grpcServer, authHandler)
 
 	fmt.Printf("Auth server starting on port %d...\n", env.port)

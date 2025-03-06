@@ -1,7 +1,7 @@
 // The auth package contains the implementation of the Envoy External Authorization gRPC service.
 // It is responsible for receiving requests from Envoy and authorizing them based on the GatewayEndpoint
-// data stored in the endpointstore package. It receives a check request from Envoy, containing a user ID parsed
-// from a JWT in the previous HTTP filter defined in `envoy.yaml`.
+// data stored in the endpointstore package. It receives a check request from GUARD and determines if
+// the request should be authorized.
 package auth
 
 import (
@@ -20,12 +20,12 @@ import (
 
 const (
 	// TODO_TECHDEBT(@commoddity): This path segment should be configurable via a single source of truth.
-	// Not sure the best way to do this as it is referred to in multiple disparate places (eg. envoy.yaml, PATH's router.go & here)
+	// Not sure the best way to do this as it is referred to in multiple disparate places (eg. GUARD Helm charts, PATH's router.go & here)
 	pathPrefix = "/v1/"
 
-	reqHeaderEndpointID          = "endpoint-id"    // Set on all service requests
-	reqHeaderRateLimitEndpointID = "rl-endpoint-id" // Set only on service requests that should be rate limited
-	reqHeaderRateLimitThroughput = "rl-throughput"  // Set only on service requests that should be rate limited
+	reqHeaderEndpointID          = "Endpoint-Id"            // Set on all service requests
+	reqHeaderRateLimitEndpointID = "Rate-Limit-Endpoint-Id" // Set only on service requests that should be rate limited
+	reqHeaderRateLimitThroughput = "Rate-Limit-Throughput"  // Set only on service requests that should be rate limited
 
 	errBody = `{"code": %d, "message": "%s"}`
 )
@@ -50,7 +50,6 @@ type AuthHandler struct {
 
 	// The authorizers to be used for the request
 	APIKeyAuthorizer Authorizer
-	JWTAuthorizer    Authorizer
 }
 
 // Check satisfies the implementation of the Envoy External Authorization gRPC service.
@@ -129,9 +128,6 @@ func (a *AuthHandler) authGatewayEndpoint(headers map[string]string, gatewayEndp
 
 	case *proto.Auth_StaticApiKey:
 		return a.APIKeyAuthorizer.authorizeRequest(headers, gatewayEndpoint)
-
-	case *proto.Auth_Jwt:
-		return a.JWTAuthorizer.authorizeRequest(headers, gatewayEndpoint)
 
 	default:
 		return fmt.Errorf("invalid authorization type")
