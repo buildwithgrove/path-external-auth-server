@@ -77,9 +77,6 @@ func (a *AuthHandler) Check(
 
 	// Get the request headers
 	headers := req.GetHeaders()
-	if len(headers) == 0 {
-		return getDeniedCheckResponse("headers not found", envoy_type.StatusCode_BadRequest), nil
-	}
 
 	// Extract the endpoint ID from the request
 	// It may be extracted from the URL path or the headers
