@@ -60,22 +60,22 @@ func Test_GetGatewayEndpoint(t *testing.T) {
 		},
 		{
 			name:                    "should return different gateway endpoint when found",
-			endpointID:              "endpoint_2_jwt",
-			expectedGatewayEndpoint: getTestGatewayEndpoints().Endpoints["endpoint_2_jwt"],
+			endpointID:              "endpoint_2_no_auth",
+			expectedGatewayEndpoint: getTestGatewayEndpoints().Endpoints["endpoint_2_no_auth"],
 			expectedEndpointFound:   true,
 		},
 		{
 			name:                    "should return brand new gateway endpoint when update is received for new endpoint",
-			endpointID:              "endpoint_3_no_auth",
-			update:                  getTestUpdate("endpoint_3_no_auth"),
-			expectedGatewayEndpoint: getTestUpdate("endpoint_3_no_auth").GatewayEndpoint,
+			endpointID:              "endpoint_3_static_key",
+			update:                  getTestUpdate("endpoint_3_static_key"),
+			expectedGatewayEndpoint: getTestUpdate("endpoint_3_static_key").GatewayEndpoint,
 			expectedEndpointFound:   true,
 		},
 		{
 			name:                    "should return updated existing gateway endpoint when update is received for existing endpoint",
-			endpointID:              "endpoint_2_jwt",
-			update:                  getTestUpdate("endpoint_2_jwt"),
-			expectedGatewayEndpoint: getTestUpdate("endpoint_2_jwt").GatewayEndpoint,
+			endpointID:              "endpoint_2_no_auth",
+			update:                  getTestUpdate("endpoint_2_no_auth"),
+			expectedGatewayEndpoint: getTestUpdate("endpoint_2_no_auth").GatewayEndpoint,
 			expectedEndpointFound:   true,
 		},
 		{
@@ -87,7 +87,7 @@ func Test_GetGatewayEndpoint(t *testing.T) {
 		},
 		{
 			name:                    "should return false when gateway endpoint not found",
-			endpointID:              "endpoint_3_no_auth",
+			endpointID:              "endpoint_3_static_key",
 			expectedGatewayEndpoint: nil,
 			expectedEndpointFound:   false,
 		},
@@ -119,7 +119,8 @@ func Test_GetGatewayEndpoint(t *testing.T) {
 	}
 }
 
-// getTestGatewayEndpoints returns a mock response for the initial endpoint store data, received when the endpoint store is first created
+// getTestGatewayEndpoints returns a mock response for the initial endpoint store data,
+// received when the endpoint store is first created.
 func getTestGatewayEndpoints() *proto.AuthDataResponse {
 	return &proto.AuthDataResponse{
 		Endpoints: map[string]*proto.GatewayEndpoint{
@@ -139,17 +140,10 @@ func getTestGatewayEndpoints() *proto.AuthDataResponse {
 					Email:     "amos.burton@opa.belt",
 				},
 			},
-			"endpoint_2_jwt": {
-				EndpointId: "endpoint_2_jwt",
+			"endpoint_2_no_auth": {
+				EndpointId: "endpoint_2_no_auth",
 				Auth: &proto.Auth{
-					AuthType: &proto.Auth_Jwt{
-						Jwt: &proto.JWT{
-							AuthorizedUsers: map[string]*proto.Empty{
-								"auth0|user_1": {},
-								"auth0|user_2": {},
-							},
-						},
-					},
+					AuthType: &proto.Auth_NoAuth{},
 				},
 				RateLimiting: &proto.RateLimiting{},
 				Metadata: &proto.Metadata{
@@ -162,26 +156,19 @@ func getTestGatewayEndpoints() *proto.AuthDataResponse {
 	}
 }
 
-// getTestUpdate returns a mock update for a given endpoint ID, used to test the endpoint store's behavior when updates are received
+// getTestUpdate returns a mock update for a given endpoint ID, used to test the endpoint store's behavior when updates are received.
 // Will be one of three cases:
-// 1. A new GatewayEndpoint was created (endpoint_3)
-// 2. An existing GatewayEndpoint was updated (endpoint_2)
-// 3. An existing GatewayEndpoint was deleted (endpoint_1)
+// 1. An existing GatewayEndpoint was updated (endpoint_2_no_auth)
+// 2. A new GatewayEndpoint was created (endpoint_3_static_key)
+// 3. An existing GatewayEndpoint was deleted (endpoint_1_static_key)
 func getTestUpdate(endpointID string) *proto.AuthDataUpdate {
 	updatesMap := map[string]*proto.AuthDataUpdate{
-		"endpoint_2_jwt": {
-			EndpointId: "endpoint_2_jwt",
+		"endpoint_2_no_auth": {
+			EndpointId: "endpoint_2_no_auth",
 			GatewayEndpoint: &proto.GatewayEndpoint{
-				EndpointId: "endpoint_2_jwt",
+				EndpointId: "endpoint_2_no_auth",
 				Auth: &proto.Auth{
-					AuthType: &proto.Auth_Jwt{
-						Jwt: &proto.JWT{
-							AuthorizedUsers: map[string]*proto.Empty{
-								"auth0|user_1": {},
-								"auth0|user_2": {},
-							},
-						},
-					},
+					AuthType: &proto.Auth_NoAuth{},
 				},
 				RateLimiting: &proto.RateLimiting{},
 				Metadata: &proto.Metadata{
@@ -192,22 +179,22 @@ func getTestUpdate(endpointID string) *proto.AuthDataUpdate {
 			},
 			Delete: false,
 		},
-		"endpoint_3_no_auth": {
-			EndpointId: "endpoint_3_no_auth",
+		"endpoint_3_static_key": {
+			EndpointId: "endpoint_3_static_key",
 			GatewayEndpoint: &proto.GatewayEndpoint{
-				EndpointId: "endpoint_3_no_auth",
+				EndpointId: "endpoint_3_static_key",
 				Auth: &proto.Auth{
-					AuthType: &proto.Auth_NoAuth{},
+					AuthType: &proto.Auth_StaticApiKey{
+						StaticApiKey: &proto.StaticAPIKey{
+							ApiKey: "new_api_key",
+						},
+					},
 				},
-				RateLimiting: &proto.RateLimiting{
-					ThroughputLimit:     30,
-					CapacityLimit:       100_000,
-					CapacityLimitPeriod: proto.CapacityLimitPeriod_CAPACITY_LIMIT_PERIOD_MONTHLY,
-				},
+				RateLimiting: &proto.RateLimiting{},
 				Metadata: &proto.Metadata{
-					AccountId: "account_2",
-					PlanType:  "PLAN_FREE",
-					Email:     "frodo.baggins@shire.io",
+					AccountId: "account_3",
+					PlanType:  "PLAN_PRO",
+					Email:     "new.email@example.com",
 				},
 			},
 			Delete: false,
