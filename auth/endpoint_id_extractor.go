@@ -2,6 +2,7 @@ package auth
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 
 	envoy_auth "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
@@ -27,10 +28,15 @@ func extractEndpointID(req *envoy_auth.AttributeContext_HttpRequest) (string, er
 func extractFromHeader(req *envoy_auth.AttributeContext_HttpRequest) string {
 	headers := req.GetHeaders()
 
-	endpointID, ok := headers[reqHeaderEndpointID]
-	if !ok {
-		return ""
+	// Convert map[string]string to http.Header as `GetHeaders` returns
+	// map[string]string which could lead to case-sensitivity issues.
+	httpHeaders := make(http.Header)
+	for key, value := range headers {
+		httpHeaders.Add(key, value)
 	}
+
+	// Use http.Header's Get method which is case-insensitive
+	endpointID := httpHeaders.Get(reqHeaderEndpointID)
 	if endpointID == "" {
 		return ""
 	}

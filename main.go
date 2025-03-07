@@ -8,6 +8,7 @@ import (
 
 	envoy_auth "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	_ "github.com/joho/godotenv/autoload" // autoload env vars
+	"github.com/pokt-network/poktroll/pkg/polylog"
 	"github.com/pokt-network/poktroll/pkg/polylog/polyzero"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -19,13 +20,17 @@ import (
 )
 
 func main() {
-	// Initialize new polylog logger
-	logger := polyzero.NewLogger()
-
 	env, err := gatherEnvVars()
 	if err != nil {
 		panic(fmt.Errorf("failed to gather environment variables: %v", err))
 	}
+
+	loggerOpts := []polylog.LoggerOption{
+		polyzero.WithLevel(polyzero.ParseLevel(env.loggerLevel)),
+	}
+
+	// Initialize new polylog logger
+	logger := polyzero.NewLogger(loggerOpts...)
 
 	// Connect to the gRPC server for the GatewayEndpoints service
 	conn, err := connectGRPC(env.grpcHostPort, env.grpcUseInsecureCredentials)
