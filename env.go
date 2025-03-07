@@ -31,6 +31,12 @@ const (
 	// Default is 10001 if not set.
 	portEnv     = "PORT"
 	defaultPort = 10001
+
+	// [OPTIONAL]: The log level to use for the external auth server.
+	//
+	// Default is "info" if not set.
+	loggerLevelEnv     = "LOGGER_LEVEL"
+	defaultLoggerLevel = "info"
 )
 
 var grpcHostPortPattern = "^[^:]+:[0-9]+$"
@@ -42,6 +48,7 @@ type envVars struct {
 	grpcHostPort               string
 	grpcUseInsecureCredentials bool
 	port                       int
+	loggerLevel                string
 }
 
 // gatherEnvVars loads configuration from environment variables
@@ -70,6 +77,12 @@ func gatherEnvVars() (envVars, error) {
 			return envVars{}, fmt.Errorf("invalid value for %s: %v", grpcUseInsecureCredentialsEnv, err)
 		}
 		e.grpcUseInsecureCredentials = insecure
+	}
+
+	// Parse log level from environment
+	loggerLevel := os.Getenv(loggerLevelEnv)
+	if loggerLevel != "" {
+		e.loggerLevel = loggerLevel
 	}
 
 	// Apply default values for any unset configuration
@@ -105,5 +118,8 @@ func (e *envVars) validate() error {
 func (e *envVars) hydrateDefaults() {
 	if e.port == 0 {
 		e.port = defaultPort
+	}
+	if e.loggerLevel == "" {
+		e.loggerLevel = defaultLoggerLevel
 	}
 }
