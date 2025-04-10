@@ -45,6 +45,7 @@ func Test_Check(t *testing.T) {
 					OkResponse: &envoy_auth.OkHttpResponse{
 						Headers: []*envoy_core.HeaderValueOption{
 							{Header: &envoy_core.HeaderValue{Key: reqHeaderEndpointID, Value: "endpoint_free"}},
+							{Header: &envoy_core.HeaderValue{Key: reqHeaderAccountID, Value: "account_1"}},
 							{Header: &envoy_core.HeaderValue{Key: reqHeaderRateLimitEndpointID, Value: "endpoint_free"}},
 							{Header: &envoy_core.HeaderValue{Key: reqHeaderRateLimitThroughput, Value: "30"}},
 						},
@@ -89,6 +90,7 @@ func Test_Check(t *testing.T) {
 					OkResponse: &envoy_auth.OkHttpResponse{
 						Headers: []*envoy_core.HeaderValueOption{
 							{Header: &envoy_core.HeaderValue{Key: reqHeaderEndpointID, Value: "endpoint_unlimited"}},
+							{Header: &envoy_core.HeaderValue{Key: reqHeaderAccountID, Value: "account_2"}},
 						},
 					},
 				},
@@ -132,6 +134,7 @@ func Test_Check(t *testing.T) {
 					OkResponse: &envoy_auth.OkHttpResponse{
 						Headers: []*envoy_core.HeaderValueOption{
 							{Header: &envoy_core.HeaderValue{Key: reqHeaderEndpointID, Value: "api_key_endpoint"}},
+							{Header: &envoy_core.HeaderValue{Key: reqHeaderAccountID, Value: "account_3"}},
 						},
 					},
 				},
@@ -145,6 +148,9 @@ func Test_Check(t *testing.T) {
 							ApiKey: "api_key_good",
 						},
 					},
+				},
+				Metadata: &proto.Metadata{
+					AccountId: "account_3",
 				},
 			},
 		},
@@ -168,6 +174,7 @@ func Test_Check(t *testing.T) {
 					OkResponse: &envoy_auth.OkHttpResponse{
 						Headers: []*envoy_core.HeaderValueOption{
 							{Header: &envoy_core.HeaderValue{Key: reqHeaderEndpointID, Value: "public_endpoint"}},
+							{Header: &envoy_core.HeaderValue{Key: reqHeaderAccountID, Value: "account_4"}},
 						},
 					},
 				},
@@ -179,6 +186,9 @@ func Test_Check(t *testing.T) {
 					AuthType: &proto.Auth_NoAuth{
 						NoAuth: &proto.NoAuth{},
 					},
+				},
+				Metadata: &proto.Metadata{
+					AccountId: "account_4",
 				},
 			},
 		},
@@ -205,6 +215,7 @@ func Test_Check(t *testing.T) {
 					OkResponse: &envoy_auth.OkHttpResponse{
 						Headers: []*envoy_core.HeaderValueOption{
 							{Header: &envoy_core.HeaderValue{Key: reqHeaderEndpointID, Value: "endpoint_id_from_header"}},
+							{Header: &envoy_core.HeaderValue{Key: reqHeaderAccountID, Value: "account_5"}},
 						},
 					},
 				},
@@ -216,6 +227,9 @@ func Test_Check(t *testing.T) {
 					AuthType: &proto.Auth_NoAuth{
 						NoAuth: &proto.NoAuth{},
 					},
+				},
+				Metadata: &proto.Metadata{
+					AccountId: "account_5",
 				},
 			},
 		},
