@@ -24,6 +24,7 @@ const (
 	pathPrefix = "/v1/"
 
 	reqHeaderEndpointID          = "Endpoint-Id"            // Set on all service requests
+	reqHeaderAccountID           = "Account-Id"             // Set on all service requests
 	reqHeaderRateLimitEndpointID = "Rate-Limit-Endpoint-Id" // Set only on service requests that should be rate limited
 	reqHeaderRateLimitThroughput = "Rate-Limit-Throughput"  // Set only on service requests that should be rate limited
 
@@ -151,6 +152,14 @@ func (a *AuthHandler) getHTTPHeaders(gatewayEndpoint *proto.GatewayEndpoint) []*
 			Header: &envoy_core.HeaderValue{
 				Key:   reqHeaderRateLimitEndpointID,
 				Value: gatewayEndpoint.GetEndpointId(),
+			},
+		})
+
+		// Set the account ID header
+		headers = append(headers, &envoy_core.HeaderValueOption{
+			Header: &envoy_core.HeaderValue{
+				Key:   reqHeaderAccountID,
+				Value: gatewayEndpoint.GetMetadata().GetAccountId(),
 			},
 		})
 
