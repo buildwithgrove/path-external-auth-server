@@ -24,6 +24,7 @@ const (
 	pathPrefix = "/v1/"
 
 	reqHeaderEndpointID          = "Endpoint-Id"            // Set on all service requests
+	reqHeaderAccountID           = "Account-Id"             // Set on all service requests
 	reqHeaderRateLimitEndpointID = "Rate-Limit-Endpoint-Id" // Set only on service requests that should be rate limited
 	reqHeaderRateLimitThroughput = "Rate-Limit-Throughput"  // Set only on service requests that should be rate limited
 
@@ -133,12 +134,21 @@ func (a *AuthHandler) authGatewayEndpoint(headers map[string]string, gatewayEndp
 
 // getHTTPHeaders sets all HTTP headers required by the PATH services on the request being forwarded
 func (a *AuthHandler) getHTTPHeaders(gatewayEndpoint *proto.GatewayEndpoint) []*envoy_core.HeaderValueOption {
-	// Set endpoint ID header on all requests
 	headers := []*envoy_core.HeaderValueOption{
+		// Set endpoint ID header on all requests
+		// eg. "Endpoint-Id: a12b3c4d"
 		{
 			Header: &envoy_core.HeaderValue{
 				Key:   reqHeaderEndpointID,
 				Value: gatewayEndpoint.GetEndpointId(),
+			},
+		},
+		// Set account ID header on all requests
+		// eg. "Account-Id: 3f4g2js2"
+		{
+			Header: &envoy_core.HeaderValue{
+				Key:   reqHeaderAccountID,
+				Value: gatewayEndpoint.GetMetadata().GetAccountId(),
 			},
 		},
 	}
@@ -147,6 +157,7 @@ func (a *AuthHandler) getHTTPHeaders(gatewayEndpoint *proto.GatewayEndpoint) []*
 	if gatewayEndpoint.GetRateLimiting().GetThroughputLimit() > 0 {
 
 		// Set the rate limit endpoint ID header
+		// eg. "Rate-Limit-Endpoint-Id: a12b3c4d"
 		headers = append(headers, &envoy_core.HeaderValueOption{
 			Header: &envoy_core.HeaderValue{
 				Key:   reqHeaderRateLimitEndpointID,
@@ -155,6 +166,7 @@ func (a *AuthHandler) getHTTPHeaders(gatewayEndpoint *proto.GatewayEndpoint) []*
 		})
 
 		// Set the account plan type header
+		// eg. "Rate-Limit-Throughput: 30"
 		headers = append(headers, &envoy_core.HeaderValueOption{
 			Header: &envoy_core.HeaderValue{
 				Key:   reqHeaderRateLimitThroughput,

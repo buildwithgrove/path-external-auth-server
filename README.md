@@ -25,7 +25,19 @@ PEAS receives a list of `GatewayEndpoints` that define which endpoints are autho
 
 `GatewayEndpoint` data is received from a `remote gRPC server` that may be implemented by a PATH gateway operator in any way they see fit. The only requirement is that it adhere to the to spec defined in the protobuf definition. 
 
-### 🐾 PADS (PATH Auth Data Server)
+
+## Request Headers
+
+PEAS adds the following headers to authorized requests before forwarding them to the upstream service:
+
+| Header                   | Contents                                      | Included For All Requests           | Example Value |
+| ------------------------ | --------------------------------------------- | ----------------------------------- | ------------- |
+| `Endpoint-Id`            | The endpoint ID of the authorized endpoint    | ✅                                   | "a12b3c4d"    |
+| `Account-Id`             | The account ID associated with the endpoint   | ✅                                   | "3f4g2js2"    |
+| `Rate-Limit-Endpoint-Id` | The endpoint ID for rate limiting purposes    | ❌ (Only for rate-limited endpoints) | "a12b3c4d"    |
+| `Rate-Limit-Throughput`  | The maximum throughput limit for the endpoint | ❌ (Only for rate-limited endpoints) | 30            |
+
+## 🐾 PADS (PATH Auth Data Server)
 
 PADS is a minimal implementation of the `remote gRPC server` that provides data from either a static YAML file or a highly-opinionated Postgres database implementation. It may be used by Gateway operators and is the standard implementation of the `remote gRPC server` used in the GUARD Helm charts.
 
