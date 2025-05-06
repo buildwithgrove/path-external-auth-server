@@ -7,7 +7,9 @@
 package endpointstore
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"sync"
@@ -46,14 +48,49 @@ func NewEndpointStore(ctx context.Context, logger polylog.Logger, grpcClient pro
 		gatewayEndpointsMu: sync.RWMutex{},
 	}
 
-	// Retry initialization until it succeeds
-	for {
-		err := store.initializeStoreFromRemote(context.Background())
+	// Use exponential backoff for initialization
+	backoff := 500 * time.Millisecond
+	maxBackoff := 10 * time.Second
+	maxAttempts := 10
+	attempt := 0
+
+	for attempt < maxAttempts {
+		attempt++
+
+		// Check if context is done before attempting initialization
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
+		err := store.initializeStoreFromRemote(ctx)
 		if err == nil {
+			store.logger.Info().Int("attempt", attempt).Msg("successfully initialized endpoint store")
 			break
 		}
-		store.logger.Error().Err(err).Msg("failed to set store, retrying in 2 seconds...")
-		time.Sleep(2 * time.Second)
+
+		if attempt == maxAttempts {
+			store.logger.Error().Int("max_attempts", maxAttempts).Msg("exceeded maximum initialization attempts")
+			return nil, fmt.Errorf("failed to initialize endpoint store after %d attempts: %w", maxAttempts, err)
+		}
+
+		store.logger.Warn().
+			Err(err).
+			Int("attempt", attempt).
+			Int("max_attempts", maxAttempts).
+			Dur("backoff", backoff).
+			Msg("failed to initialize endpoint store, retrying...")
+
+		// Wait with exponential backoff
+		select {
+		case <-time.After(backoff):
+			// Increase backoff for next attempt
+			backoff = time.Duration(float64(backoff) * 1.5)
+			backoff = min(backoff, maxBackoff)
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
 	}
 
 	// Start listening for updates from the remote gRPC server.
@@ -91,27 +128,75 @@ func (c *endpointStore) initializeStoreFromRemote(ctx context.Context) error {
 // 2. An existing GatewayEndpoint was updated
 // 3. An existing GatewayEndpoint was deleted
 func (c *endpointStore) listenForRemoteUpdates(ctx context.Context) {
+	backoff := reconnectDelay
+	maxBackoff := 30 * time.Second
+
 	for {
-		// TODO_IMPROVE(@commoddity): improve the reconnection logic to better handle the
-		// remote server restarting or other connection issues that may arise.
-		if err := c.connectAndProcessUpdates(ctx); err != nil {
-			c.logger.Error().Err(err).Msg("error in update stream, retrying")
-			<-time.After(reconnectDelay)
+		// If the context is done, exit the goroutine
+		select {
+		case <-ctx.Done():
+			c.logger.Info().Msg("context cancelled, stopping update stream")
+			return
+		default:
+		}
+
+		err := c.connectAndProcessUpdates(ctx)
+		if err != nil {
+			c.logger.Error().Err(err).Dur("backoff", backoff).Msg("error in update stream, retrying")
+
+			// Wait for backoff period before reconnecting
+			select {
+			case <-time.After(backoff):
+				// Increase backoff for next attempt with exponential backoff, capped at maxBackoff
+				backoff = time.Duration(float64(backoff) * 1.5)
+				backoff = min(backoff, maxBackoff)
+			case <-ctx.Done():
+				return
+			}
+		} else {
+			// Reset backoff on successful connection
+			backoff = reconnectDelay
+			c.logger.Info().Msg("update stream ended normally, reconnecting")
+
+			// Small delay to avoid hammering the server
+			select {
+			case <-time.After(100 * time.Millisecond):
+			case <-ctx.Done():
+				return
+			}
 		}
 	}
 }
 
 // connectAndProcessUpdates connects to the remote gRPC server and processes updates from the server.
 func (c *endpointStore) connectAndProcessUpdates(ctx context.Context) error {
-	stream, err := c.grpcClient.StreamAuthDataUpdates(ctx, &proto.AuthDataUpdatesRequest{})
+	// First try to refresh the entire store when reconnecting
+	// This ensures we have the latest state in case we missed updates while disconnected
+	// If this fails, continue with stream anyway as it might work
+	c.logger.Info().Msg("refreshing endpoint store before starting stream")
+	err := c.initializeStoreFromRemote(ctx)
+	if err != nil {
+		c.logger.Warn().Err(err).Msg("failed to refresh endpoint store, continuing with existing data")
+	} else {
+		c.logger.Info().Msg("successfully refreshed endpoint store")
+	}
+
+	// Create a child context that we can cancel if needed
+	streamCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	c.logger.Info().Msg("connecting to stream auth data updates")
+	stream, err := c.grpcClient.StreamAuthDataUpdates(streamCtx, &proto.AuthDataUpdatesRequest{})
 	if err != nil {
 		return fmt.Errorf("failed to stream updates from remote server: %w", err)
 	}
 
+	c.logger.Info().Msg("connected to stream auth data updates")
+
 	for {
 		select {
 		case <-ctx.Done():
-			c.logger.Info().Msg("context cancelled, stopping update stream")
+			c.logger.Info().Msg("parent context cancelled, stopping update stream")
 			return nil
 		default:
 			update, err := stream.Recv()
@@ -120,12 +205,15 @@ func (c *endpointStore) connectAndProcessUpdates(ctx context.Context) error {
 				return nil // Return to trigger a reconnection
 			}
 			if err != nil {
+				c.logger.Error().Err(err).Msg("error receiving update")
 				return fmt.Errorf("error receiving update: %w", err)
 			}
 			if update == nil {
 				c.logger.Error().Msg("received nil update")
 				continue
 			}
+
+			PrettyLog("DEBUG PEAS- received update", update)
 
 			c.gatewayEndpointsMu.Lock()
 			if update.Delete {
@@ -137,5 +225,17 @@ func (c *endpointStore) connectAndProcessUpdates(ctx context.Context) error {
 			}
 			c.gatewayEndpointsMu.Unlock()
 		}
+	}
+}
+
+func PrettyLog(args ...interface{}) {
+	for _, arg := range args {
+		var prettyJSON bytes.Buffer
+		jsonArg, _ := json.Marshal(arg)
+		str := string(jsonArg)
+		_ = json.Indent(&prettyJSON, []byte(str), "", "    ")
+		output := prettyJSON.String()
+
+		fmt.Println(output)
 	}
 }
