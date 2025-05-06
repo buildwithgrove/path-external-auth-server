@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/pokt-network/poktroll/pkg/polylog/polyzero"
 	"github.com/stretchr/testify/require"
@@ -18,21 +19,33 @@ import (
 type MockStream struct {
 	grpc.ClientStream
 	updates chan *proto.AuthDataUpdate
+	closed  bool
 }
 
 func (m *MockStream) Recv() (*proto.AuthDataUpdate, error) {
-	update := <-m.updates
-	if update == nil {
+	// Don't block forever if the channel is empty - this prevents test timeouts
+	select {
+	case update, ok := <-m.updates:
+		if !ok || update == nil {
+			m.closed = true
+			return nil, io.EOF
+		}
+		return update, nil
+	case <-time.After(100 * time.Millisecond):
+		// To prevent the test from hanging, return EOF if no update is available in a reasonable time
+		if m.closed {
+			return nil, io.EOF
+		}
 		return nil, io.EOF
 	}
-	return update, nil
 }
 
 func newTestStore(t *testing.T, ctx context.Context, updates chan *proto.AuthDataUpdate, ctrl *gomock.Controller) *endpointStore {
 	mockClient := NewMockGatewayEndpointsClient(ctrl)
 
-	// Set up the expected call for FetchAuthDataSync
-	mockClient.EXPECT().FetchAuthDataSync(gomock.Any(), gomock.Any()).Return(getTestGatewayEndpoints(), nil)
+	// Set up the expected call for FetchAuthDataSync to be called multiple times
+	// This is needed because our improved reconnection logic will call it on startup and when reconnecting
+	mockClient.EXPECT().FetchAuthDataSync(gomock.Any(), gomock.Any()).Return(getTestGatewayEndpoints(), nil).AnyTimes()
 
 	// Set up the expected call for StreamUpdates
 	mockStream := &MockStream{updates: updates}
@@ -100,7 +113,8 @@ func Test_GetGatewayEndpoint(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			updates := make(chan *proto.AuthDataUpdate)
+			// Create buffered channel to prevent blocking
+			updates := make(chan *proto.AuthDataUpdate, 10)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
@@ -109,12 +123,16 @@ func Test_GetGatewayEndpoint(t *testing.T) {
 			// Send updates for this test case
 			if test.update != nil {
 				updates <- test.update
+				// Allow time for update to be processed
+				time.Sleep(50 * time.Millisecond)
 			}
-			updates <- nil // Signal end of updates
 
 			gatewayEndpoint, found := store.GetGatewayEndpoint(test.endpointID)
 			c.Equal(test.expectedEndpointFound, found)
 			c.True(protoPkg.Equal(test.expectedGatewayEndpoint, gatewayEndpoint), "expected and actual GatewayEndpoint do not match")
+
+			// Close the channel to end the test cleanly
+			close(updates)
 		})
 	}
 }

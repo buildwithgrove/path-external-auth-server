@@ -7,9 +7,7 @@
 package endpointstore
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"sync"
@@ -213,8 +211,6 @@ func (c *endpointStore) connectAndProcessUpdates(ctx context.Context) error {
 				continue
 			}
 
-			PrettyLog("DEBUG PEAS- received update", update)
-
 			c.gatewayEndpointsMu.Lock()
 			if update.Delete {
 				delete(c.gatewayEndpoints, update.EndpointId)
@@ -225,17 +221,5 @@ func (c *endpointStore) connectAndProcessUpdates(ctx context.Context) error {
 			}
 			c.gatewayEndpointsMu.Unlock()
 		}
-	}
-}
-
-func PrettyLog(args ...interface{}) {
-	for _, arg := range args {
-		var prettyJSON bytes.Buffer
-		jsonArg, _ := json.Marshal(arg)
-		str := string(jsonArg)
-		_ = json.Indent(&prettyJSON, []byte(str), "", "    ")
-		output := prettyJSON.String()
-
-		fmt.Println(output)
 	}
 }
