@@ -7,7 +7,7 @@
 
 ## Introduction
 
-**PEAS** (PATH External Auth Server) is an external authorization server that can be used to authorize requests to the [PATH Gateway](https://github.com/buildwithgrove/path). It is part of the GUARD authorization system for PATH and runs in the GUARD cluster.
+**PEAS** (PATH External Auth Server) is an external authorization server that can be used to authorize requests to the [PATH Gateway](https://github.com/buildwithgrove/path). It is part of the GUARD authorization system for PATH and runs in the PATH Kubernetes cluster.
 
 ### Docker Image
 
@@ -25,7 +25,6 @@ PEAS receives a list of `GatewayEndpoints` that define which endpoints are autho
 
 `GatewayEndpoint` data is received from a `remote gRPC server` that may be implemented by a PATH gateway operator in any way they see fit. The only requirement is that it adhere to the to spec defined in the protobuf definition. 
 
-
 ## Request Headers
 
 PEAS adds the following headers to authorized requests before forwarding them to the upstream service:
@@ -38,7 +37,7 @@ PEAS adds the following headers to authorized requests before forwarding them to
 
 ## 🐾 PADS (PATH Auth Data Server)
 
-PADS is a minimal implementation of the `remote gRPC server` that provides data from either a static YAML file or a highly-opinionated Postgres database implementation. It may be used by Gateway operators and is the standard implementation of the `remote gRPC server` used in the GUARD Helm charts.
+PADS provides data from either a static YAML file or a Grove-specific Postgres database implementation.
 
 - [PADS Repository](https://github.com/buildwithgrove/path-auth-data-server)
 
