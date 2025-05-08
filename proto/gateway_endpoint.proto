@@ -64,12 +64,8 @@ message GatewayEndpoint {
   // The authorization settings for the GatewayEndpoint.
   Auth auth = 2;
 
-  // The rate limiting settings for the GatewayEndpoint.
-  // This includes both throughput (TPS) limit and the capacity (longer period) limit.
-  RateLimiting rate_limiting = 3;
-
   // Optional metadata for the GatewayEndpoint, which can be set to any additional information.
-  Metadata metadata = 4;
+  Metadata metadata = 3;
 }
 
 // The authorization settings for a GatewayEndpoint.
@@ -89,30 +85,6 @@ message NoAuth {}
 message StaticAPIKey {
   // The API key to use for authorization.
   string api_key = 1;
-}
-
-// The rate limiting settings for a GatewayEndpoint.
-message RateLimiting {
-  // ThroughputLimit refers to rate limiting per-second (TPS).
-  // This is used to prevent DoS or DDoS attacks, as well as enforce pricing plan limits.
-  int32 throughput_limit = 1;
-
-  // CapacityLimit refers to rate limiting over longer periods, such as a day, week or month.
-  // This is to prevent abuse of the services provided, as well enforce pricing plan limits.
-  int32 capacity_limit = 2;
-
-  // The period over which the CapacityLimit is enforced. One of `daily`, `weekly` or `monthly`.
-  CapacityLimitPeriod capacity_limit_period = 3;
-}
-
-// CapacityLimitPeriod is the period over which the capacity limit is enforced.
-// For example: CapacityLimit=`100,000` and CapacityLimitPeriod=`daily`
-// enforces a rate limit of 100,000 requests per day.
-enum CapacityLimitPeriod {
-  CAPACITY_LIMIT_PERIOD_UNSPECIFIED = 0;
-  CAPACITY_LIMIT_PERIOD_DAILY = 1;
-  CAPACITY_LIMIT_PERIOD_WEEKLY = 2;
-  CAPACITY_LIMIT_PERIOD_MONTHLY = 3;
 }
 
 // Metadata is the metadata for a GatewayEndpoint, defined as fields that are not

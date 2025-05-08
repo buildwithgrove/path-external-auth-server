@@ -151,7 +151,6 @@ func getTestGatewayEndpoints() *proto.AuthDataResponse {
 						},
 					},
 				},
-				RateLimiting: &proto.RateLimiting{},
 				Metadata: &proto.Metadata{
 					AccountId: "account_1",
 					PlanType:  "PLAN_UNLIMITED",
@@ -163,7 +162,6 @@ func getTestGatewayEndpoints() *proto.AuthDataResponse {
 				Auth: &proto.Auth{
 					AuthType: &proto.Auth_NoAuth{},
 				},
-				RateLimiting: &proto.RateLimiting{},
 				Metadata: &proto.Metadata{
 					AccountId: "account_2",
 					PlanType:  "PLAN_UNLIMITED",
@@ -188,7 +186,6 @@ func getTestUpdate(endpointID string) *proto.AuthDataUpdate {
 				Auth: &proto.Auth{
 					AuthType: &proto.Auth_NoAuth{},
 				},
-				RateLimiting: &proto.RateLimiting{},
 				Metadata: &proto.Metadata{
 					AccountId: "account_2",
 					PlanType:  "PLAN_UNLIMITED",
@@ -208,7 +205,6 @@ func getTestUpdate(endpointID string) *proto.AuthDataUpdate {
 						},
 					},
 				},
-				RateLimiting: &proto.RateLimiting{},
 				Metadata: &proto.Metadata{
 					AccountId: "account_3",
 					PlanType:  "PLAN_PRO",

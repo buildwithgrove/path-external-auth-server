@@ -23,13 +23,30 @@ const (
 	// Not sure the best way to do this as it is referred to in multiple disparate places (eg. GUARD Helm charts, PATH's router.go & here)
 	pathPrefix = "/v1/"
 
-	reqHeaderEndpointID          = "Endpoint-Id"            // Set on all service requests
-	reqHeaderAccountID           = "Account-Id"             // Set on all service requests
-	reqHeaderRateLimitEndpointID = "Rate-Limit-Endpoint-Id" // Set only on service requests that should be rate limited
-	reqHeaderRateLimitThroughput = "Rate-Limit-Throughput"  // Set only on service requests that should be rate limited
+	reqHeaderEndpointID = "Endpoint-Id" // Set on all service requests
+	reqHeaderAccountID  = "Account-Id"  // Set on all service requests
 
 	errBody = `{"code": %d, "message": "%s"}`
 )
+
+// Set only on endpoints with plan types that should be rate limited
+// The key is the plan type as specified in the database.
+// The value is the header key to be matched in the GUARD configuration.
+//
+// DEV_NOTE: New plans from the database should be added to this map.
+//
+// Documentation reference:
+// https://gateway.envoyproxy.io/docs/tasks/traffic/global-rate-limit/#rate-limit-distinct-users-except-admin
+const (
+	dbPlanFree     = "PLAN_FREE"    // The plan type as specified in the database
+	planFreeHeader = "Rl-Plan-Free" // The header key to be matched in the GUARD configuration
+)
+
+// Map used to convert the plan type as specified in the database to the
+// header key to be matched in the GUARD configuration.
+var rateLimitedPlanTypeHeaders = map[string]string{
+	dbPlanFree: planFreeHeader,
+}
 
 // The EndpointStore interface contains an in-memory store of GatewayEndpoints
 // and their associated data from the PADS (PATH Auth Data Server).
@@ -134,13 +151,16 @@ func (a *AuthHandler) authGatewayEndpoint(headers map[string]string, gatewayEndp
 
 // getHTTPHeaders sets all HTTP headers required by the PATH services on the request being forwarded
 func (a *AuthHandler) getHTTPHeaders(gatewayEndpoint *proto.GatewayEndpoint) []*envoy_core.HeaderValueOption {
+	endpointID := gatewayEndpoint.GetEndpointId()
+	metadata := gatewayEndpoint.GetMetadata()
+
 	headers := []*envoy_core.HeaderValueOption{
 		// Set endpoint ID header on all requests
 		// eg. "Endpoint-Id: a12b3c4d"
 		{
 			Header: &envoy_core.HeaderValue{
 				Key:   reqHeaderEndpointID,
-				Value: gatewayEndpoint.GetEndpointId(),
+				Value: endpointID,
 			},
 		},
 		// Set account ID header on all requests
@@ -148,32 +168,24 @@ func (a *AuthHandler) getHTTPHeaders(gatewayEndpoint *proto.GatewayEndpoint) []*
 		{
 			Header: &envoy_core.HeaderValue{
 				Key:   reqHeaderAccountID,
-				Value: gatewayEndpoint.GetMetadata().GetAccountId(),
+				Value: metadata.GetAccountId(),
 			},
 		},
 	}
 
-	// Set rate limit headers if the gateway endpoint should be rate limited
-	if gatewayEndpoint.GetRateLimiting().GetThroughputLimit() > 0 {
-
-		// Set the rate limit endpoint ID header
-		// eg. "Rate-Limit-Endpoint-Id: a12b3c4d"
-		headers = append(headers, &envoy_core.HeaderValueOption{
-			Header: &envoy_core.HeaderValue{
-				Key:   reqHeaderRateLimitEndpointID,
-				Value: gatewayEndpoint.GetEndpointId(),
-			},
-		})
-
-		// Set the account plan type header
-		// eg. "Rate-Limit-Throughput: 30"
-		headers = append(headers, &envoy_core.HeaderValueOption{
-			Header: &envoy_core.HeaderValue{
-				Key:   reqHeaderRateLimitThroughput,
-				Value: fmt.Sprintf("%d", gatewayEndpoint.GetRateLimiting().GetThroughputLimit()),
-			},
-		})
-
+	// Set rate limit headers if the endpoint should be rate limited
+	if planType := metadata.GetPlanType(); planType != "" {
+		// Only plans that are configured to be rate limited should have a rate limit header
+		if rateLimitHeader, ok := rateLimitedPlanTypeHeaders[planType]; ok {
+			// Set the rate header with the endpoint ID
+			// eg. "Rate-Limit-Plan-Free: a12b3c4d"
+			headers = append(headers, &envoy_core.HeaderValueOption{
+				Header: &envoy_core.HeaderValue{
+					Key:   rateLimitHeader,
+					Value: endpointID,
+				},
+			})
+		}
 	}
 
 	return headers
