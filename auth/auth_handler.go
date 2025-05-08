@@ -23,8 +23,11 @@ const (
 	// Not sure the best way to do this as it is referred to in multiple disparate places (eg. GUARD Helm charts, PATH's router.go & here)
 	pathPrefix = "/v1/"
 
-	reqHeaderEndpointID = "Endpoint-Id" // Set on all service requests
-	reqHeaderAccountID  = "Account-Id"  // Set on all service requests
+	// The endpoint and account id need to match PATH's expected HTTP headers.
+	// See the following code section in PATH:
+	// https://github.com/buildwithgrove/path/blob/1e7b2d83294e8c406479ae5e480f4dca97414cee/gateway/observation.go#L16-L18
+	reqHeaderEndpointID = "Portal-Application-ID" // Set on all service requests
+	reqHeaderAccountID  = "Portal-Account-ID"     // Set on all service requests
 
 	errBody = `{"code": %d, "message": "%s"}`
 )
@@ -104,16 +107,19 @@ func (a *AuthHandler) Check(
 		return getDeniedCheckResponse(err.Error(), envoy_type.StatusCode_BadRequest), nil
 	}
 
-	a.Logger.Debug().Str("endpoint_id", endpointID).Msg("handling check request")
+	logger := a.Logger.With("endpoint_id", endpointID)
+	logger.Debug().Msg("handling check request")
 
 	// Fetch GatewayEndpoint from endpoint store
 	gatewayEndpoint, ok := a.getGatewayEndpoint(endpointID)
 	if !ok {
+		logger.Info().Msg("specified endpoint not found: rejecting the request.")
 		return getDeniedCheckResponse("endpoint not found", envoy_type.StatusCode_NotFound), nil
 	}
 
 	// Perform all configured authorization checks
 	if err := a.authGatewayEndpoint(headers, gatewayEndpoint); err != nil {
+		logger.Info().Err(err).Msg("request failed authorization: rejecting the request.")
 		return getDeniedCheckResponse(err.Error(), envoy_type.StatusCode_Unauthorized), nil
 	}
 
