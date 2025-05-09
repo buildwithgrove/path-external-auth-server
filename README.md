@@ -31,7 +31,7 @@ PEAS adds the following headers to authorized requests before forwarding them to
 
 | Header                  | Contents                                               | Included For All Requests           | Example Value |
 | ----------------------- | ------------------------------------------------------ | ----------------------------------- | ------------- |
-| `Portal-Application-ID` | The portal application ID of the authorized endpoint   | ✅                                   | "a12b3c4d"    |
+| `Portal-Application-ID` | The portal application ID of the authorized portal app | ✅                                   | "a12b3c4d"    |
 | `Portal-Account-ID`     | The account ID associated with the portal application  | ✅                                   | "3f4g2js2"    |
 | `Rl-Plan-Free`          | The endpoint ID for rate limiting purposes (PLAN_FREE) | ❌ (Only for rate-limited endpoints) | "a12b3c4d"    |
 
