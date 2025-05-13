@@ -9,12 +9,13 @@
 
 -- /*-------------------- Listener Updates --------------------*/
 
--- Create the changes table with an 'is_delete' field
+-- Create the changes table with 'is_delete' and 'processed_at' fields
 CREATE TABLE portal_application_changes (
     id SERIAL PRIMARY KEY,
     portal_app_id VARCHAR(24) NOT NULL,
     is_delete BOOLEAN NOT NULL DEFAULT FALSE,
-    changed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    changed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    processed_at TIMESTAMP WITH TIME ZONE NULL
 );
 
 -- Create the trigger function with 'is_delete' handling

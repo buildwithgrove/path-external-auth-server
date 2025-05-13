@@ -19,10 +19,10 @@ type portalApplicationRow struct {
 }
 
 // sqlcPortalAppsToPortalAppRow (not the plurality of Apps) converts a row from the
-// `SelectPortalApplicationsRow` query to the intermediate portalApplicationRow struct.
+// `SelectPortalAppsRow` query to the intermediate portalApplicationRow struct.
 // This is necessary because SQLC generates a specific struct for each query, which needs
 // to be converted to a common struct before converting to the proto.PortalApp struct.
-func sqlcPortalAppsToPortalAppRow(r sqlc.SelectPortalApplicationsRow) *portalApplicationRow {
+func sqlcPortalAppsToPortalAppRow(r sqlc.SelectPortalAppsRow) *portalApplicationRow {
 	return &portalApplicationRow{
 		ID:                r.ID,
 		SecretKey:         r.SecretKey.String,
@@ -34,10 +34,10 @@ func sqlcPortalAppsToPortalAppRow(r sqlc.SelectPortalApplicationsRow) *portalApp
 }
 
 // sqlcPortalAppToPortalAppRow (not the singularity of App) converts a row from the
-// `SelectPortalApplicationRow` query to the intermediate portalApplicationRow struct.
+// `SelectPortalAppRow` query to the intermediate portalApplicationRow struct.
 // This is necessary because SQLC generates a specific struct for each query, which needs
 // to be converted to a common struct before converting to the proto.PortalApp struct.
-func sqlcPortalAppToPortalAppRow(r sqlc.SelectPortalApplicationRow) *portalApplicationRow {
+func sqlcPortalAppToPortalAppRow(r sqlc.SelectPortalAppRow) *portalApplicationRow {
 	return &portalApplicationRow{
 		ID:                r.ID,
 		SecretKey:         r.SecretKey.String,
@@ -81,7 +81,7 @@ func (r *portalApplicationRow) getRateLimitDetails() *store.RateLimit {
 	return nil
 }
 
-func sqlcPortalAppsToPortalApps(rows []sqlc.SelectPortalApplicationsRow) map[store.PortalAppID]*store.PortalApp {
+func sqlcPortalAppsToPortalApps(rows []sqlc.SelectPortalAppsRow) map[store.PortalAppID]*store.PortalApp {
 	portalApps := make(map[store.PortalAppID]*store.PortalApp, len(rows))
 	for _, row := range rows {
 		portalAppRow := sqlcPortalAppsToPortalAppRow(row)

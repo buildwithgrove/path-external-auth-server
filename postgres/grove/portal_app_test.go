@@ -13,13 +13,13 @@ import (
 func Test_sqlcPortalAppsToProto(t *testing.T) {
 	tests := []struct {
 		name     string
-		rows     []sqlc.SelectPortalApplicationsRow
+		rows     []sqlc.SelectPortalAppsRow
 		expected map[store.PortalAppID]*store.PortalApp
 		wantErr  bool
 	}{
 		{
 			name: "should convert rows to auth data response successfully",
-			rows: []sqlc.SelectPortalApplicationsRow{
+			rows: []sqlc.SelectPortalAppsRow{
 				{
 					ID:                "portal_app_1_static_key",
 					AccountID:         pgtype.Text{String: "account_1", Valid: true},

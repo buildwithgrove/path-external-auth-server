@@ -2,7 +2,7 @@
 -- It contains all queries used for fetching user data by the Gateway.
 -- See: https://docs.sqlc.dev/en/latest/tutorials/getting-started-postgresql.html#schema-and-queries
 
--- name: SelectPortalApplications :many
+-- name: SelectPortalApps :many
 SELECT 
     pa.id,
     pas.secret_key,
@@ -23,7 +23,7 @@ GROUP BY
     a.plan_type,
     a.monthly_user_limit;
 
--- name: SelectPortalApplication :one
+-- name: SelectPortalApp :one
 SELECT 
     pa.id,
     pas.secret_key,
@@ -44,12 +44,18 @@ GROUP BY
     a.plan_type,
     a.monthly_user_limit;
 
--- name: GetPortalApplicationChanges :many
+-- name: GetPortalAppChanges :many
 SELECT id,
     portal_app_id,
     is_delete
-FROM portal_application_changes;
+FROM portal_application_changes
+WHERE processed_at IS NULL;
 
--- name: DeletePortalApplicationChanges :exec
+-- name: MarkPortalAppChangesProcessed :exec
+UPDATE portal_application_changes
+SET processed_at = NOW()
+WHERE id = ANY(@change_ids::int[]);
+
+-- name: DeleteProcessedPortalAppChanges :exec
 DELETE FROM portal_application_changes
-WHERE id = ANY(@change_ids::int []);
+WHERE processed_at < NOW() - INTERVAL '5 seconds';

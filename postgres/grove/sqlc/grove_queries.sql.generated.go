@@ -11,38 +11,39 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const deletePortalApplicationChanges = `-- name: DeletePortalApplicationChanges :exec
+const deleteProcessedPortalAppChanges = `-- name: DeleteProcessedPortalAppChanges :exec
 DELETE FROM portal_application_changes
-WHERE id = ANY($1::int [])
+WHERE processed_at < NOW() - INTERVAL '5 seconds'
 `
 
-func (q *Queries) DeletePortalApplicationChanges(ctx context.Context, changeIds []int32) error {
-	_, err := q.db.Exec(ctx, deletePortalApplicationChanges, changeIds)
+func (q *Queries) DeleteProcessedPortalAppChanges(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, deleteProcessedPortalAppChanges)
 	return err
 }
 
-const getPortalApplicationChanges = `-- name: GetPortalApplicationChanges :many
+const getPortalAppChanges = `-- name: GetPortalAppChanges :many
 SELECT id,
     portal_app_id,
     is_delete
 FROM portal_application_changes
+WHERE processed_at IS NULL
 `
 
-type GetPortalApplicationChangesRow struct {
+type GetPortalAppChangesRow struct {
 	ID          int32  `json:"id"`
 	PortalAppID string `json:"portal_app_id"`
 	IsDelete    bool   `json:"is_delete"`
 }
 
-func (q *Queries) GetPortalApplicationChanges(ctx context.Context) ([]GetPortalApplicationChangesRow, error) {
-	rows, err := q.db.Query(ctx, getPortalApplicationChanges)
+func (q *Queries) GetPortalAppChanges(ctx context.Context) ([]GetPortalAppChangesRow, error) {
+	rows, err := q.db.Query(ctx, getPortalAppChanges)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetPortalApplicationChangesRow
+	var items []GetPortalAppChangesRow
 	for rows.Next() {
-		var i GetPortalApplicationChangesRow
+		var i GetPortalAppChangesRow
 		if err := rows.Scan(&i.ID, &i.PortalAppID, &i.IsDelete); err != nil {
 			return nil, err
 		}
@@ -54,7 +55,18 @@ func (q *Queries) GetPortalApplicationChanges(ctx context.Context) ([]GetPortalA
 	return items, nil
 }
 
-const selectPortalApplication = `-- name: SelectPortalApplication :one
+const markPortalAppChangesProcessed = `-- name: MarkPortalAppChangesProcessed :exec
+UPDATE portal_application_changes
+SET processed_at = NOW()
+WHERE id = ANY($1::int[])
+`
+
+func (q *Queries) MarkPortalAppChangesProcessed(ctx context.Context, changeIds []int32) error {
+	_, err := q.db.Exec(ctx, markPortalAppChangesProcessed, changeIds)
+	return err
+}
+
+const selectPortalApp = `-- name: SelectPortalApp :one
 SELECT 
     pa.id,
     pas.secret_key,
@@ -76,7 +88,7 @@ GROUP BY
     a.monthly_user_limit
 `
 
-type SelectPortalApplicationRow struct {
+type SelectPortalAppRow struct {
 	ID                string      `json:"id"`
 	SecretKey         pgtype.Text `json:"secret_key"`
 	SecretKeyRequired pgtype.Bool `json:"secret_key_required"`
@@ -85,9 +97,9 @@ type SelectPortalApplicationRow struct {
 	MonthlyUserLimit  pgtype.Int4 `json:"monthly_user_limit"`
 }
 
-func (q *Queries) SelectPortalApplication(ctx context.Context, id string) (SelectPortalApplicationRow, error) {
-	row := q.db.QueryRow(ctx, selectPortalApplication, id)
-	var i SelectPortalApplicationRow
+func (q *Queries) SelectPortalApp(ctx context.Context, id string) (SelectPortalAppRow, error) {
+	row := q.db.QueryRow(ctx, selectPortalApp, id)
+	var i SelectPortalAppRow
 	err := row.Scan(
 		&i.ID,
 		&i.SecretKey,
@@ -99,7 +111,7 @@ func (q *Queries) SelectPortalApplication(ctx context.Context, id string) (Selec
 	return i, err
 }
 
-const selectPortalApplications = `-- name: SelectPortalApplications :many
+const selectPortalApps = `-- name: SelectPortalApps :many
 
 SELECT 
     pa.id,
@@ -122,7 +134,7 @@ GROUP BY
     a.monthly_user_limit
 `
 
-type SelectPortalApplicationsRow struct {
+type SelectPortalAppsRow struct {
 	ID                string      `json:"id"`
 	SecretKey         pgtype.Text `json:"secret_key"`
 	SecretKeyRequired pgtype.Bool `json:"secret_key_required"`
@@ -134,15 +146,15 @@ type SelectPortalApplicationsRow struct {
 // This file is used by SQLC to autogenerate the Go code needed by the database driver.
 // It contains all queries used for fetching user data by the Gateway.
 // See: https://docs.sqlc.dev/en/latest/tutorials/getting-started-postgresql.html#schema-and-queries
-func (q *Queries) SelectPortalApplications(ctx context.Context) ([]SelectPortalApplicationsRow, error) {
-	rows, err := q.db.Query(ctx, selectPortalApplications)
+func (q *Queries) SelectPortalApps(ctx context.Context) ([]SelectPortalAppsRow, error) {
+	rows, err := q.db.Query(ctx, selectPortalApps)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []SelectPortalApplicationsRow
+	var items []SelectPortalAppsRow
 	for rows.Next() {
-		var i SelectPortalApplicationsRow
+		var i SelectPortalAppsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.SecretKey,

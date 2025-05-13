@@ -4,6 +4,7 @@ go 1.23.1
 
 require (
 	github.com/envoyproxy/go-control-plane/envoy v1.32.4
+	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.4
 	github.com/jackc/pgxlisten v0.0.0-20241106001234-1d6f6656415c
 	github.com/joho/godotenv v1.5.1
