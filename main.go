@@ -1,25 +1,22 @@
 package main
 
 import (
-	"context"
-	"crypto/tls"
 	"fmt"
 	"net"
 
 	envoy_auth "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
-	_ "github.com/joho/godotenv/autoload" // autoload env vars
 	"github.com/pokt-network/poktroll/pkg/polylog"
 	"github.com/pokt-network/poktroll/pkg/polylog/polyzero"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/buildwithgrove/path-external-auth-server/auth"
-	store "github.com/buildwithgrove/path-external-auth-server/endpoint_store"
-	"github.com/buildwithgrove/path-external-auth-server/proto"
+	store "github.com/buildwithgrove/path-external-auth-server/portal_app_store"
+	"github.com/buildwithgrove/path-external-auth-server/postgres/grove"
 )
 
 func main() {
+	fmt.Println("🫛  Starting PEAS (Path External Auth Server) ...")
+
 	env, err := gatherEnvVars()
 	if err != nil {
 		panic(fmt.Errorf("failed to gather environment variables: %v", err))
@@ -32,23 +29,25 @@ func main() {
 	// Initialize new polylog logger
 	logger := polyzero.NewLogger(loggerOpts...)
 
-	// Connect to the gRPC server for the GatewayEndpoints service
-	conn, err := connectGRPC(env.grpcHostPort, env.grpcUseInsecureCredentials)
+	// Create a new postgres data source
+	dataSource, err := grove.NewGrovePostgresDriver(
+		logger,
+		env.postgresConnectionString,
+	)
 	if err != nil {
-		panic(fmt.Sprintf("failed to connect to gRPC server: %v", err))
+		panic(fmt.Sprintf("failed to connect to postgres: %v", err))
 	}
-	defer conn.Close()
+	defer dataSource.Close()
 
-	// Create a new gRPC client for the GatewayEndpoints service
-	grpcClient := proto.NewGatewayEndpointsClient(conn)
+	logger.Info().Msg("Successfully connected to postgres")
 
-	// Create a new endpoint store
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	endpointStore, err := store.NewEndpointStore(ctx, logger, grpcClient)
+	// Create a new portal app store
+	portalAppStore, err := store.NewPortalAppStore(logger, dataSource)
 	if err != nil {
 		panic(err)
 	}
+
+	logger.Info().Msg("Successfully initialized portal app store")
 
 	// Create a new listener to listen for requests from GUARD
 	listen, err := net.Listen("tcp", fmt.Sprintf(":%d", env.port))
@@ -58,9 +57,8 @@ func main() {
 
 	// Create a new AuthHandler to handle the request auth
 	authHandler := &auth.AuthHandler{
-		Logger: logger,
-
-		EndpointStore:    endpointStore,
+		Logger:           logger,
+		PortalAppStore:   portalAppStore,
 		APIKeyAuthorizer: &auth.APIKeyAuthorizer{},
 	}
 
@@ -74,18 +72,4 @@ func main() {
 	if err = grpcServer.Serve(listen); err != nil {
 		panic(err)
 	}
-}
-
-/* -------------------- Gateway Init Helpers -------------------- */
-
-// connectGRPC connects to the gRPC server for the GatewayEndpoints service
-// and returns a gRPC client connection.
-func connectGRPC(hostPort string, useInsecureCredentials bool) (*grpc.ClientConn, error) {
-	var creds credentials.TransportCredentials
-	if useInsecureCredentials {
-		creds = insecure.NewCredentials()
-	} else {
-		creds = credentials.NewTLS(&tls.Config{})
-	}
-	return grpc.NewClient(hostPort, grpc.WithTransportCredentials(creds))
 }

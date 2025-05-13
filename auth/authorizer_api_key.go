@@ -1,26 +1,34 @@
 package auth
 
-import (
-	"github.com/buildwithgrove/path-external-auth-server/proto"
+import store "github.com/buildwithgrove/path-external-auth-server/portal_app_store"
+
+const (
+	authHeaderKey = "Authorization"
+	apiKeyPrefix  = "Bearer "
 )
 
-const reqHeaderAPIKey = "authorization" // Standard header for API keys
-
-// APIKeyAuthorizer is an Authorizer that ensures the request is authorized
-// by checking if the API key matches the GatewayEndpoint's API key.
+// APIKeyAuthorizer authorizes a request using an API key.
+// It compares the API key in the request headers with the API key in the PortalApp.
 type APIKeyAuthorizer struct{}
 
-// Enforce that the APIKeyAuthorizer implements the Authorizer interface.
-var _ Authorizer = &APIKeyAuthorizer{}
+// authorizeRequest authorizes a request using an API key.
+func (a *APIKeyAuthorizer) authorizeRequest(headers map[string]string, gatewayPortalApp *store.PortalApp) error {
+	// Extract the API key from the Authorization header
+	headerValue := headers[authHeaderKey]
+	if headerValue == "" {
+		return errUnauthorized
+	}
 
-// authorizeRequest checks if the API key is valid for the endpoint
-func (a *APIKeyAuthorizer) authorizeRequest(headers map[string]string, endpoint *proto.GatewayEndpoint) error {
-	apiKey, ok := headers[reqHeaderAPIKey]
-	if !ok || apiKey == "" {
+	// Remove the "Bearer " prefix from the API key if present
+	apiKey := headerValue
+	if len(headerValue) > len(apiKeyPrefix) && headerValue[:len(apiKeyPrefix)] == apiKeyPrefix {
+		apiKey = headerValue[len(apiKeyPrefix):]
+	}
+
+	// Compare the API key with the expected value
+	if apiKey != gatewayPortalApp.Auth.APIKey {
 		return errUnauthorized
 	}
-	if endpoint.GetAuth().GetStaticApiKey().GetApiKey() != apiKey {
-		return errUnauthorized
-	}
+
 	return nil
 }

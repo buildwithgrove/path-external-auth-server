@@ -1,0 +1,261 @@
+package grove
+
+import (
+	"context"
+	"fmt"
+	"regexp"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgxlisten"
+	"github.com/pokt-network/poktroll/pkg/polylog"
+
+	store "github.com/buildwithgrove/path-external-auth-server/portal_app_store"
+	"github.com/buildwithgrove/path-external-auth-server/postgres/grove/sqlc"
+)
+
+// GrovePostgresDriver implements the store.DataSource interface
+// to provide data from Grove's Postgres database for the portal app store.
+var _ store.DataSource = &GrovePostgresDriver{}
+
+type (
+	// GrovePostgresDriver implements the store.DataSource interface
+	// to provide data from a Postgres database for the portal app store.
+	GrovePostgresDriver struct {
+		driver   *postgresDriver
+		listener *pgxlisten.Listener
+
+		notificationCh chan *Notification
+		updatesCh      chan store.PortalAppUpdate
+
+		logger polylog.Logger
+	}
+
+	// The postgresDriver struct wraps the SQLC generated queries and the pgxpool.Pool.
+	// See: https://docs.sqlc.dev/en/latest/tutorials/getting-started-postgresql.html
+	postgresDriver struct {
+		*sqlc.Queries
+		DB *pgxpool.Pool
+	}
+)
+
+/* ---------- Postgres Connection Funcs ---------- */
+
+// Regular expression to match a valid PostgreSQL connection string
+var postgresConnectionStringRegex = regexp.MustCompile(`^postgres(?:ql)?:\/\/[^:]+:[^@]+@[^:]+:\d+\/[^?]+(?:\?.+)?$`)
+
+/*
+NewGrovePostgresDriver returns a PostgreSQL data source that implements the store.DataSource interface.
+
+The data source connects to a PostgreSQL database and:
+1. Provides methods to fetch initial gateway portal app data
+2. Provides a channel for receiving portal app updates
+3. Listens for changes from the database
+*/
+func NewGrovePostgresDriver(
+	logger polylog.Logger,
+	connectionString string,
+) (*GrovePostgresDriver, error) {
+
+	if !isValidPostgresConnectionString(connectionString) {
+		return nil, fmt.Errorf("invalid postgres connection string")
+	}
+
+	config, err := pgxpool.ParseConfig(connectionString)
+	if err != nil {
+		return nil, err
+	}
+
+	pool, err := pgxpool.NewWithConfig(context.Background(), config)
+	if err != nil {
+		return nil, fmt.Errorf("pgxpool.NewWithConfig: %v", err)
+	}
+
+	// Verify connection immediately
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("failed to ping database: %v", err)
+	}
+
+	driver := &postgresDriver{
+		Queries: sqlc.New(pool),
+		DB:      pool,
+	}
+
+	updatesCh := make(chan store.PortalAppUpdate, 100_000)
+
+	dataSource := &GrovePostgresDriver{
+		driver:         driver,
+		listener:       newPGXPoolListener(pool, logger),
+		notificationCh: make(chan *Notification),
+		updatesCh:      updatesCh,
+		logger:         logger,
+	}
+
+	// Start listening for updates from the Postgres database
+	go dataSource.listenForUpdates(context.Background())
+
+	return dataSource, nil
+}
+
+// isValidPostgresConnectionString checks if a string is a valid PostgreSQL connection string.
+func isValidPostgresConnectionString(s string) bool {
+	return postgresConnectionStringRegex.MatchString(s)
+}
+
+/* ---------- DataSource Interface Implementation ---------- */
+
+// FetchInitialData loads the full set of PortalApps from the Postgres database.
+func (d *GrovePostgresDriver) FetchInitialData() (map[store.PortalAppID]*store.PortalApp, error) {
+	d.logger.Info().Msg("Executing SelectPortalApplications query...")
+	rows, err := d.driver.Queries.SelectPortalApplications(context.Background())
+	if err != nil {
+		d.logger.Error().Err(err).Msg("failed to fetch portal applications from database")
+		return nil, fmt.Errorf("failed to fetch portal applications: %w", err)
+	}
+
+	d.logger.Info().Int("num_rows", len(rows)).Msg("Successfully fetched initial data from Postgres")
+
+	return sqlcPortalAppsToPortalApps(rows), nil
+}
+
+// GetUpdateChannel returns a channel that provides updates to portal apps.
+func (d *GrovePostgresDriver) GetUpdateChannel() <-chan store.PortalAppUpdate {
+	return d.updatesCh
+}
+
+// Close cleans up resources used by the data source.
+func (d *GrovePostgresDriver) Close() {
+	// The listener doesn't have a Close method, but when
+	// we close the DB pool it will close the connections
+	d.driver.DB.Close()
+}
+
+/* ---------- Data Update Listener Funcs ---------- */
+
+const portalApplicationChangesChannel = "portal_application_changes"
+
+type Notification struct {
+	Payload string
+}
+
+type PGXNotificationHandler struct {
+	outCh chan *Notification
+}
+
+func (h *PGXNotificationHandler) HandleNotification(ctx context.Context, n *pgconn.Notification, conn *pgx.Conn) error {
+	h.outCh <- &Notification{Payload: n.Payload}
+	return nil
+}
+
+// newPGXPoolListener creates a new pgxlisten.Listener with a connection from the provided pool and output channel.
+// It listens for updates from the Postgres database, using the function and triggers defined in "./postgres/sqlc/grove_triggers.sql"
+func newPGXPoolListener(pool *pgxpool.Pool, logger polylog.Logger) *pgxlisten.Listener {
+	connectFunc := func(ctx context.Context) (*pgx.Conn, error) {
+		// Set a timeout for acquiring a connection
+		acquireCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+
+		conn, err := pool.Acquire(acquireCtx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to acquire connection: %v", err)
+		}
+		return conn.Conn(), nil
+	}
+
+	listener := &pgxlisten.Listener{
+		Connect: connectFunc,
+		LogError: func(ctx context.Context, err error) {
+			logger.Error().Err(err).Msg("listener error")
+		},
+	}
+
+	return listener
+}
+
+func (d *GrovePostgresDriver) listenForUpdates(ctx context.Context) {
+	handler := &PGXNotificationHandler{outCh: d.notificationCh}
+	d.listener.Handle(portalApplicationChangesChannel, handler)
+
+	go func() {
+		if err := d.listener.Listen(ctx); err != nil {
+			d.logger.Error().Err(err).Msg("error initializing listener")
+		}
+	}()
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				d.logger.Info().Msg("context cancelled, stopping notification processor")
+				return
+
+			case notification := <-d.notificationCh:
+				// Process the notification
+				if notification == nil {
+					continue
+				}
+
+				// Create a context with timeout for processing changes
+				processCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				err := d.processPortalApplicationChanges(processCtx)
+				cancel()
+				if err != nil {
+					d.logger.Error().Err(err).Msg("failed to process portal application changes")
+				}
+			}
+		}
+	}()
+}
+
+func (d *GrovePostgresDriver) processPortalApplicationChanges(ctx context.Context) error {
+	changes, err := d.driver.GetPortalApplicationChanges(ctx)
+	if err != nil {
+		return err
+	}
+
+	if len(changes) == 0 {
+		return nil
+	}
+
+	var changeIDs []int32
+
+	for _, change := range changes {
+		if change.IsDelete {
+			update := store.PortalAppUpdate{
+				PortalAppID: store.PortalAppID(change.PortalAppID),
+				Delete:      true,
+			}
+			d.updatesCh <- update
+		} else {
+			portalAppRow, err := d.driver.SelectPortalApplication(ctx, change.PortalAppID)
+			if err != nil {
+				d.logger.Error().Err(err).Msg("failed to get portal application")
+				continue
+			}
+
+			gatewayPortalApp := sqlcPortalAppToPortalAppRow(portalAppRow).convertToPortalApp()
+
+			// Send the update
+			update := store.PortalAppUpdate{
+				PortalAppID: gatewayPortalApp.PortalAppID,
+				PortalApp:   gatewayPortalApp,
+			}
+			d.updatesCh <- update
+		}
+
+		changeIDs = append(changeIDs, change.ID)
+	}
+
+	// Use the autogenerated method to delete the processed changes
+	err = d.driver.DeletePortalApplicationChanges(ctx, changeIDs)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

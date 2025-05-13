@@ -5,26 +5,17 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+
+	// autoload env vars
+	_ "github.com/joho/godotenv/autoload"
 )
 
 const (
-	// [REQUIRED]: The host and port for the remote gRPC server connection
-	// that provides the GatewayEndpoint data for the auth server.
+	// [REQUIRED]: The PostgreSQL connection string for the database
+	// that provides the PortalApp data for the auth server.
 	//
-	// GRPC_HOST_PORT=guard-pads:10002 is the value to point to the default
-	// PADS server in the cluster created by the GUARD Helm Chart.
-	//
-	// Example: "localhost:10002" or "auth-server.buildwithgrove.com:443"
-	grpcHostPortEnv = "GRPC_HOST_PORT"
-
-	// [OPTIONAL]: Whether to use insecure credentials for the gRPC connection.
-	//
-	// GRPC_USE_INSECURE_CREDENTIALS=true is required to run PEAS in the
-	// cluster created by the GUARD Helm Chart, as PADS does not have TLS
-	// enabled by default.
-	//
-	// Default is "false" if not set.
-	grpcUseInsecureCredentialsEnv = "GRPC_USE_INSECURE_CREDENTIALS"
+	// Example: "postgresql://username:password@localhost:5432/dbname"
+	postgresConnectionStringEnv = "POSTGRES_CONNECTION_STRING"
 
 	// [OPTIONAL]: The port to run the external auth server on.
 	//
@@ -39,24 +30,23 @@ const (
 	defaultLoggerLevel = "info"
 )
 
-var grpcHostPortPattern = "^[^:]+:[0-9]+$"
+var postgresConnectionStringRegex = regexp.MustCompile(`^postgres(?:ql)?:\/\/[^:]+:[^@]+@[^:]+:\d+\/[^?]+(?:\?.+)?$`)
 
 // envVars holds configuration values, all fields are private
 // Use gatherEnvVars to load values from environment variables
 // and perform validation and default hydration.
 type envVars struct {
-	grpcHostPort               string
-	grpcUseInsecureCredentials bool
-	port                       int
-	loggerLevel                string
+	postgresConnectionString string
+	port                     int
+	loggerLevel              string
 }
 
 // gatherEnvVars loads configuration from environment variables
 // and validates/hydrates defaults for missing/invalid values.
 func gatherEnvVars() (envVars, error) {
-	// Initialize with GRPC host:port from environment
+	// Initialize with postgres connection string from environment
 	e := envVars{
-		grpcHostPort: os.Getenv(grpcHostPortEnv),
+		postgresConnectionString: os.Getenv(postgresConnectionStringEnv),
 	}
 
 	// Parse port environment variable if provided
@@ -67,16 +57,6 @@ func gatherEnvVars() (envVars, error) {
 			return envVars{}, fmt.Errorf("invalid port format: %v", err)
 		}
 		e.port = p
-	}
-
-	// Parse insecure credentials flag from environment
-	insecureStr := os.Getenv(grpcUseInsecureCredentialsEnv)
-	if insecureStr != "" {
-		insecure, err := strconv.ParseBool(insecureStr)
-		if err != nil {
-			return envVars{}, fmt.Errorf("invalid value for %s: %v", grpcUseInsecureCredentialsEnv, err)
-		}
-		e.grpcUseInsecureCredentials = insecure
 	}
 
 	// Parse log level from environment
@@ -97,18 +77,18 @@ func gatherEnvVars() (envVars, error) {
 
 // validate checks that all required environment variables are set with valid values
 func (e *envVars) validate() error {
-	// Verify the GRPC host:port is specified
-	if e.grpcHostPort == "" {
-		return fmt.Errorf("%s is not set", grpcHostPortEnv)
+	// Verify the Postgres connection string is specified
+	if e.postgresConnectionString == "" {
+		return fmt.Errorf("%s is not set", postgresConnectionStringEnv)
 	}
 
-	// Ensure the GRPC host:port matches the expected format
-	matched, err := regexp.MatchString(grpcHostPortPattern, e.grpcHostPort)
+	// Ensure the Postgres connection string matches the expected format
+	matched, err := regexp.MatchString(postgresConnectionStringRegex.String(), e.postgresConnectionString)
 	if err != nil {
-		return fmt.Errorf("failed to validate grpcHostPort: %v", err)
+		return fmt.Errorf("failed to validate postgresConnectionString: %v", err)
 	}
 	if !matched {
-		return fmt.Errorf("grpcHostPort does not match the required pattern")
+		return fmt.Errorf("postgresConnectionString does not match the required pattern")
 	}
 
 	return nil

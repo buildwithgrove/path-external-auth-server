@@ -27,13 +27,18 @@ test_all_verbose: ## Runs all tests with verbose output enabled
 test_unit: ## Runs unit tests only (excludes Postgres Docker integration tests)
 	go test ./... -short -count=1
 
-#######################
-### Proto  Helpers ####
-#######################
+###############################
+### Mock Generation Targets ###
+###############################
 
-.PHONY: proto_gen_envoy
-proto_gen_envoy: ## Generate envoy protobuf artifacts
-	protoc \
-		--go_out=./proto \
-		--go-grpc_out=./proto \
-		proto/gateway_endpoint.proto
+.PHONY: gen_mocks
+gen_mocks: ## Generates the mocks for the project
+	mockgen -source=./portal_app_store/data_source.go -destination=./portal_app_store/data_source_mock_test.go -package=portalappstore
+
+#############################
+### SQL Generator Targets ###
+#############################
+
+.PHONY: grove_gen_sqlc
+grove_gen_sqlc: ## Generates the SQLC code for Grove's portal schema
+	sqlc generate -f ./postgres/grove/sqlc/sqlc.yaml

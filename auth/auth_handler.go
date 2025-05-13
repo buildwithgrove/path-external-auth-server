@@ -1,6 +1,6 @@
 // The auth package contains the implementation of the Envoy External Authorization gRPC service.
-// It is responsible for receiving requests from Envoy and authorizing them based on the GatewayEndpoint
-// data stored in the endpointstore package. It receives a check request from GUARD and determines if
+// It is responsible for receiving requests from Envoy and authorizing them based on the PortalApp
+// data stored in the portalappstore package. It receives a check request from GUARD and determines if
 // the request should be authorized.
 package auth
 
@@ -15,7 +15,7 @@ import (
 	"google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
 
-	"github.com/buildwithgrove/path-external-auth-server/proto"
+	store "github.com/buildwithgrove/path-external-auth-server/portal_app_store"
 	"github.com/buildwithgrove/path-external-auth-server/ratelimit"
 )
 
@@ -24,22 +24,20 @@ const (
 	// Not sure the best way to do this as it is referred to in multiple disparate places (eg. GUARD Helm charts, PATH's router.go & here)
 	pathPrefix = "/v1/"
 
-	// The endpoint and account id need to match PATH's expected HTTP headers.
+	// The portal app and account id need to match PATH's expected HTTP headers.
 	// See the following code section in PATH:
 	// https://github.com/buildwithgrove/path/blob/1e7b2d83294e8c406479ae5e480f4dca97414cee/gateway/observation.go#L16-L18
-	reqHeaderEndpointID = "Portal-Application-ID" // Set on all service requests
-	reqHeaderAccountID  = "Portal-Account-ID"     // Set on all service requests
+	reqHeaderPortalAppID = "Portal-Application-ID" // Set on all service requests
+	reqHeaderAccountID   = "Portal-Account-ID"     // Set on all service requests
 
 	errBody = `{"code": %d, "message": "%s"}`
 )
 
-// The EndpointStore interface contains an in-memory store of GatewayEndpoints
-// and their associated data from the PADS (PATH Auth Data Server).
-// See: https://github.com/buildwithgrove/path-auth-data-server
+// The PortalAppStore interface contains an in-memory store of PortalApps.
 //
-// It used to allow fast lookups of authorization data for PATH when processing requests.
-type EndpointStore interface {
-	GetGatewayEndpoint(endpointID string) (*proto.GatewayEndpoint, bool)
+// It is used to allow fast lookups of authorization data for PATH when processing requests.
+type PortalAppStore interface {
+	GetPortalApp(portalAppID store.PortalAppID) (*store.PortalApp, bool)
 }
 
 // The AuthHandler struct contains the methods for processing requests from Envoy,
@@ -47,9 +45,8 @@ type EndpointStore interface {
 type AuthHandler struct {
 	Logger polylog.Logger
 
-	// The EndpointStore contains an in-memory store of GatewayEndpoints
-	// and their associated data from the PADS (PATH Auth Data Server).
-	EndpointStore EndpointStore
+	// The PortalAppStore contains an in-memory store of PortalApps
+	PortalAppStore PortalAppStore
 
 	// The authorizers to be used for the request
 	APIKeyAuthorizer Authorizer
@@ -57,9 +54,9 @@ type AuthHandler struct {
 
 // Check satisfies the implementation of the Envoy External Authorization gRPC service.
 // It performs the following steps:
-// - Extracts the endpoint ID from the path
+// - Extracts the portal app ID from the path
 // - Extracts the account user ID from the headers
-// - Fetches the GatewayEndpoint from the database
+// - Fetches the PortalApp from the database
 // - Performs all configured authorization checks
 // - Returns a response with the HTTP headers set
 func (a *AuthHandler) Check(
@@ -81,33 +78,33 @@ func (a *AuthHandler) Check(
 	// Get the request headers
 	headers := req.GetHeaders()
 
-	// Extract the endpoint ID from the request
+	// Extract the portal app ID from the request
 	// It may be extracted from the URL path or the headers
-	endpointID, err := extractEndpointID(req)
+	portalAppID, err := extractPortalAppID(req)
 	if err != nil {
-		a.Logger.Info().Err(err).Msg("unable to extract endpoint ID from request")
+		a.Logger.Info().Err(err).Msg("unable to extract portal app ID from request")
 		return getDeniedCheckResponse(err.Error(), envoy_type.StatusCode_BadRequest), nil
 	}
 
-	logger := a.Logger.With("endpoint_id", endpointID)
+	logger := a.Logger.With("portal_app_id", portalAppID)
 	logger.Debug().Msg("handling check request")
 
-	// Fetch GatewayEndpoint from endpoint store
-	gatewayEndpoint, ok := a.getGatewayEndpoint(endpointID)
+	// Fetch PortalApp from portal app store
+	gatewayPortalApp, ok := a.getPortalApp(portalAppID)
 	if !ok {
-		logger.Info().Msg("specified endpoint not found: rejecting the request.")
-		return getDeniedCheckResponse("endpoint not found", envoy_type.StatusCode_NotFound), nil
+		logger.Info().Msg("specified portal app not found: rejecting the request.")
+		return getDeniedCheckResponse("portal app not found", envoy_type.StatusCode_NotFound), nil
 	}
 
 	// Perform all configured authorization checks
-	if err := a.authGatewayEndpoint(headers, gatewayEndpoint); err != nil {
+	if err := a.authPortalApp(headers, gatewayPortalApp); err != nil {
 		logger.Info().Err(err).Msg("request failed authorization: rejecting the request.")
 		return getDeniedCheckResponse(err.Error(), envoy_type.StatusCode_Unauthorized), nil
 	}
 
-	// Add endpoint ID and rate limiting values to the headers
+	// Add portal app ID and rate limiting values to the headers
 	// to be passed upstream along the filter chain to the rate limiter.
-	httpHeaders := a.getHTTPHeaders(gatewayEndpoint)
+	httpHeaders := a.getHTTPHeaders(gatewayPortalApp)
 
 	// Return a valid response with the HTTP headers set
 	return getOKCheckResponse(httpHeaders), nil
@@ -115,40 +112,34 @@ func (a *AuthHandler) Check(
 
 /* --------------------------------- Helpers -------------------------------- */
 
-// getGatewayEndpoint fetches the GatewayEndpoint from the endpoint store and a bool indicating if it was found
-func (a *AuthHandler) getGatewayEndpoint(endpointID string) (*proto.GatewayEndpoint, bool) {
-	return a.EndpointStore.GetGatewayEndpoint(endpointID)
+// getPortalApp fetches the PortalApp from the portal app store and a bool indicating if it was found
+func (a *AuthHandler) getPortalApp(portalAppID store.PortalAppID) (*store.PortalApp, bool) {
+	return a.PortalAppStore.GetPortalApp(portalAppID)
 }
 
-// authGatewayEndpoint performs all configured authorization checks on the request
-func (a *AuthHandler) authGatewayEndpoint(headers map[string]string, gatewayEndpoint *proto.GatewayEndpoint) error {
-	// Get the authorization type for the gateway endpoint
-	authType := gatewayEndpoint.GetAuth().GetAuthType()
-
-	switch authType.(type) {
-	case *proto.Auth_NoAuth:
-		return nil // If the endpoint has no authorization requirements, return no error
-
-	case *proto.Auth_StaticApiKey:
-		return a.APIKeyAuthorizer.authorizeRequest(headers, gatewayEndpoint)
-
-	default:
-		return fmt.Errorf("invalid authorization type")
+// authPortalApp performs all configured authorization checks on the request
+func (a *AuthHandler) authPortalApp(headers map[string]string, gatewayPortalApp *store.PortalApp) error {
+	// If the portal app has no authorization requirements, return no error
+	if gatewayPortalApp.Auth == nil || gatewayPortalApp.Auth.APIKey == "" {
+		return nil
 	}
+
+	// Otherwise, perform API Key authorization
+	return a.APIKeyAuthorizer.authorizeRequest(headers, gatewayPortalApp)
 }
 
 // getHTTPHeaders sets all HTTP headers required by the PATH services on the request being forwarded
-func (a *AuthHandler) getHTTPHeaders(gatewayEndpoint *proto.GatewayEndpoint) []*envoy_core.HeaderValueOption {
-	endpointID := gatewayEndpoint.GetEndpointId()
-	metadata := gatewayEndpoint.GetMetadata()
+func (a *AuthHandler) getHTTPHeaders(gatewayPortalApp *store.PortalApp) []*envoy_core.HeaderValueOption {
+	portalAppID := string(gatewayPortalApp.PortalAppID)
+	accountID := string(gatewayPortalApp.AccountID)
 
 	headers := []*envoy_core.HeaderValueOption{
-		// Set endpoint ID header on all requests
-		// eg. "Endpoint-Id: a12b3c4d"
+		// Set portal app ID header on all requests
+		// eg. "PortalApp-Id: a12b3c4d"
 		{
 			Header: &envoy_core.HeaderValue{
-				Key:   reqHeaderEndpointID,
-				Value: endpointID,
+				Key:   reqHeaderPortalAppID,
+				Value: portalAppID,
 			},
 		},
 		// Set account ID header on all requests
@@ -156,14 +147,16 @@ func (a *AuthHandler) getHTTPHeaders(gatewayEndpoint *proto.GatewayEndpoint) []*
 		{
 			Header: &envoy_core.HeaderValue{
 				Key:   reqHeaderAccountID,
-				Value: metadata.GetAccountId(),
+				Value: accountID,
 			},
 		},
 	}
 
-	// Check if endpoint should be rate limited and add the rate limit header if so
-	if rateLimitHeader := ratelimit.GetRateLimitHeader(endpointID, metadata); rateLimitHeader != nil {
-		headers = append(headers, rateLimitHeader)
+	// Check if portal app should be rate limited and add the rate limit header if so
+	if gatewayPortalApp.RateLimit != nil {
+		if rateLimitHeader := ratelimit.GetRateLimitHeader(portalAppID, gatewayPortalApp.RateLimit); rateLimitHeader != nil {
+			headers = append(headers, rateLimitHeader)
+		}
 	}
 
 	return headers

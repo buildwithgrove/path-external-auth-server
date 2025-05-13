@@ -14,25 +14,25 @@ import (
 	"google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
 
-	"github.com/buildwithgrove/path-external-auth-server/proto"
+	store "github.com/buildwithgrove/path-external-auth-server/portal_app_store"
 	"github.com/buildwithgrove/path-external-auth-server/ratelimit"
 )
 
 func Test_Check(t *testing.T) {
 	tests := []struct {
-		name               string
-		checkReq           *envoy_auth.CheckRequest
-		expectedResp       *envoy_auth.CheckResponse
-		endpointID         string
-		mockEndpointReturn *proto.GatewayEndpoint
+		name                string
+		checkReq            *envoy_auth.CheckRequest
+		expectedResp        *envoy_auth.CheckResponse
+		portalAppID         store.PortalAppID
+		mockPortalAppReturn *store.PortalApp
 	}{
 		{
-			name: "should return OK check response if check request is valid and user is authorized to access endpoint with rate limit headers set",
+			name: "should return OK check response if check request is valid and user is authorized to access portal app with rate limit headers set",
 			checkReq: &envoy_auth.CheckRequest{
 				Attributes: &envoy_auth.AttributeContext{
 					Request: &envoy_auth.AttributeContext_Request{
 						Http: &envoy_auth.AttributeContext_HttpRequest{
-							Path: "/v1/endpoint_free",
+							Path: "/v1/portal_app_free",
 						},
 					},
 				},
@@ -45,34 +45,32 @@ func Test_Check(t *testing.T) {
 				HttpResponse: &envoy_auth.CheckResponse_OkResponse{
 					OkResponse: &envoy_auth.OkHttpResponse{
 						Headers: []*envoy_core.HeaderValueOption{
-							{Header: &envoy_core.HeaderValue{Key: reqHeaderEndpointID, Value: "endpoint_free"}},
+							{Header: &envoy_core.HeaderValue{Key: reqHeaderPortalAppID, Value: "portal_app_free"}},
 							{Header: &envoy_core.HeaderValue{Key: reqHeaderAccountID, Value: "account_1"}},
-							{Header: &envoy_core.HeaderValue{Key: ratelimit.PlanFreeHeader, Value: "endpoint_free"}},
+							{Header: &envoy_core.HeaderValue{Key: ratelimit.PlanFreeHeader, Value: "portal_app_free"}},
 						},
 					},
 				},
 			},
-			endpointID: "endpoint_free",
-			mockEndpointReturn: &proto.GatewayEndpoint{
-				EndpointId: "endpoint_free",
-				Auth: &proto.Auth{
-					AuthType: &proto.Auth_NoAuth{},
-				},
-				Metadata: &proto.Metadata{
-					AccountId: "account_1",
-					PlanType:  ratelimit.DBPlanFree,
+			portalAppID: "portal_app_free",
+			mockPortalAppReturn: &store.PortalApp{
+				PortalAppID: "portal_app_free",
+				AccountID:   "account_1",
+				Auth:        nil, // No auth required
+				RateLimit: &store.RateLimit{
+					PlanType: ratelimit.DBPlanFree,
 				},
 			},
 		},
 		{
-			name: "should return OK check response if check request is valid and user is authorized to access endpoint with no rate limit headers set",
+			name: "should return OK check response if check request is valid and user is authorized to access portal app with no rate limit headers set",
 			checkReq: &envoy_auth.CheckRequest{
 				Attributes: &envoy_auth.AttributeContext{
 					Request: &envoy_auth.AttributeContext_Request{
 						Http: &envoy_auth.AttributeContext_HttpRequest{
-							Path: "/v1/endpoint_unlimited",
+							Path: "/v1/portal_app_unlimited",
 							Headers: map[string]string{
-								reqHeaderAPIKey: "api_key_good",
+								authHeaderKey: "api_key_good",
 							},
 						},
 					},
@@ -86,37 +84,31 @@ func Test_Check(t *testing.T) {
 				HttpResponse: &envoy_auth.CheckResponse_OkResponse{
 					OkResponse: &envoy_auth.OkHttpResponse{
 						Headers: []*envoy_core.HeaderValueOption{
-							{Header: &envoy_core.HeaderValue{Key: reqHeaderEndpointID, Value: "endpoint_unlimited"}},
+							{Header: &envoy_core.HeaderValue{Key: reqHeaderPortalAppID, Value: "portal_app_unlimited"}},
 							{Header: &envoy_core.HeaderValue{Key: reqHeaderAccountID, Value: "account_2"}},
 						},
 					},
 				},
 			},
-			endpointID: "endpoint_unlimited",
-			mockEndpointReturn: &proto.GatewayEndpoint{
-				EndpointId: "endpoint_unlimited",
-				Auth: &proto.Auth{
-					AuthType: &proto.Auth_StaticApiKey{
-						StaticApiKey: &proto.StaticAPIKey{
-							ApiKey: "api_key_good",
-						},
-					},
+			portalAppID: "portal_app_unlimited",
+			mockPortalAppReturn: &store.PortalApp{
+				PortalAppID: "portal_app_unlimited",
+				AccountID:   "account_2",
+				Auth: &store.Auth{
+					APIKey: "api_key_good",
 				},
-				Metadata: &proto.Metadata{
-					AccountId: "account_2",
-					PlanType:  "PLAN_UNLIMITED",
-				},
+				RateLimit: nil, // No rate limiting
 			},
 		},
 		{
-			name: "should return ok check response if endpoint requires API key auth",
+			name: "should return ok check response if portal app requires API key auth",
 			checkReq: &envoy_auth.CheckRequest{
 				Attributes: &envoy_auth.AttributeContext{
 					Request: &envoy_auth.AttributeContext_Request{
 						Http: &envoy_auth.AttributeContext_HttpRequest{
-							Path: "/v1/api_key_endpoint",
+							Path: "/v1/portal_app_api_key",
 							Headers: map[string]string{
-								reqHeaderAPIKey: "api_key_good",
+								authHeaderKey: "api_key_good",
 							},
 						},
 					},
@@ -130,34 +122,28 @@ func Test_Check(t *testing.T) {
 				HttpResponse: &envoy_auth.CheckResponse_OkResponse{
 					OkResponse: &envoy_auth.OkHttpResponse{
 						Headers: []*envoy_core.HeaderValueOption{
-							{Header: &envoy_core.HeaderValue{Key: reqHeaderEndpointID, Value: "api_key_endpoint"}},
+							{Header: &envoy_core.HeaderValue{Key: reqHeaderPortalAppID, Value: "portal_app_api_key"}},
 							{Header: &envoy_core.HeaderValue{Key: reqHeaderAccountID, Value: "account_3"}},
 						},
 					},
 				},
 			},
-			endpointID: "api_key_endpoint",
-			mockEndpointReturn: &proto.GatewayEndpoint{
-				EndpointId: "api_key_endpoint",
-				Auth: &proto.Auth{
-					AuthType: &proto.Auth_StaticApiKey{
-						StaticApiKey: &proto.StaticAPIKey{
-							ApiKey: "api_key_good",
-						},
-					},
-				},
-				Metadata: &proto.Metadata{
-					AccountId: "account_3",
+			portalAppID: "portal_app_api_key",
+			mockPortalAppReturn: &store.PortalApp{
+				PortalAppID: "portal_app_api_key",
+				AccountID:   "account_3",
+				Auth: &store.Auth{
+					APIKey: "api_key_good",
 				},
 			},
 		},
 		{
-			name: "should return ok check response if endpoint does not require auth",
+			name: "should return ok check response if portal app does not require auth",
 			checkReq: &envoy_auth.CheckRequest{
 				Attributes: &envoy_auth.AttributeContext{
 					Request: &envoy_auth.AttributeContext_Request{
 						Http: &envoy_auth.AttributeContext_HttpRequest{
-							Path: "/v1/public_endpoint",
+							Path: "/v1/portal_app_public",
 						},
 					},
 				},
@@ -170,34 +156,28 @@ func Test_Check(t *testing.T) {
 				HttpResponse: &envoy_auth.CheckResponse_OkResponse{
 					OkResponse: &envoy_auth.OkHttpResponse{
 						Headers: []*envoy_core.HeaderValueOption{
-							{Header: &envoy_core.HeaderValue{Key: reqHeaderEndpointID, Value: "public_endpoint"}},
+							{Header: &envoy_core.HeaderValue{Key: reqHeaderPortalAppID, Value: "portal_app_public"}},
 							{Header: &envoy_core.HeaderValue{Key: reqHeaderAccountID, Value: "account_4"}},
 						},
 					},
 				},
 			},
-			endpointID: "public_endpoint",
-			mockEndpointReturn: &proto.GatewayEndpoint{
-				EndpointId: "public_endpoint",
-				Auth: &proto.Auth{
-					AuthType: &proto.Auth_NoAuth{
-						NoAuth: &proto.NoAuth{},
-					},
-				},
-				Metadata: &proto.Metadata{
-					AccountId: "account_4",
-				},
+			portalAppID: "portal_app_public",
+			mockPortalAppReturn: &store.PortalApp{
+				PortalAppID: "portal_app_public",
+				AccountID:   "account_4",
+				Auth:        nil, // No auth required
 			},
 		},
 		{
-			name: "should return ok check response if endpoint ID is passed via header",
+			name: "should return ok check response if portal app ID is passed via header",
 			checkReq: &envoy_auth.CheckRequest{
 				Attributes: &envoy_auth.AttributeContext{
 					Request: &envoy_auth.AttributeContext_Request{
 						Http: &envoy_auth.AttributeContext_HttpRequest{
 							Path: "/v1",
 							Headers: map[string]string{
-								reqHeaderEndpointID: "endpoint_id_from_header",
+								reqHeaderPortalAppID: "portal_app_id_from_header",
 							},
 						},
 					},
@@ -211,32 +191,26 @@ func Test_Check(t *testing.T) {
 				HttpResponse: &envoy_auth.CheckResponse_OkResponse{
 					OkResponse: &envoy_auth.OkHttpResponse{
 						Headers: []*envoy_core.HeaderValueOption{
-							{Header: &envoy_core.HeaderValue{Key: reqHeaderEndpointID, Value: "endpoint_id_from_header"}},
+							{Header: &envoy_core.HeaderValue{Key: reqHeaderPortalAppID, Value: "portal_app_id_from_header"}},
 							{Header: &envoy_core.HeaderValue{Key: reqHeaderAccountID, Value: "account_5"}},
 						},
 					},
 				},
 			},
-			endpointID: "endpoint_id_from_header",
-			mockEndpointReturn: &proto.GatewayEndpoint{
-				EndpointId: "endpoint_id_from_header",
-				Auth: &proto.Auth{
-					AuthType: &proto.Auth_NoAuth{
-						NoAuth: &proto.NoAuth{},
-					},
-				},
-				Metadata: &proto.Metadata{
-					AccountId: "account_5",
-				},
+			portalAppID: "portal_app_id_from_header",
+			mockPortalAppReturn: &store.PortalApp{
+				PortalAppID: "portal_app_id_from_header",
+				AccountID:   "account_5",
+				Auth:        nil, // No auth required
 			},
 		},
 		{
-			name: "should return denied check response if gateway endpoint not found",
+			name: "should return denied check response if gateway portal app not found",
 			checkReq: &envoy_auth.CheckRequest{
 				Attributes: &envoy_auth.AttributeContext{
 					Request: &envoy_auth.AttributeContext_Request{
 						Http: &envoy_auth.AttributeContext_HttpRequest{
-							Path: "/v1/endpoint_not_found",
+							Path: "/v1/portal_app_not_found",
 						},
 					},
 				},
@@ -244,29 +218,29 @@ func Test_Check(t *testing.T) {
 			expectedResp: &envoy_auth.CheckResponse{
 				Status: &status.Status{
 					Code:    int32(codes.PermissionDenied),
-					Message: "endpoint not found",
+					Message: "portal app not found",
 				},
 				HttpResponse: &envoy_auth.CheckResponse_DeniedResponse{
 					DeniedResponse: &envoy_auth.DeniedHttpResponse{
 						Status: &envoy_type.HttpStatus{
 							Code: envoy_type.StatusCode_NotFound,
 						},
-						Body: `{"code": 404, "message": "endpoint not found"}`,
+						Body: `{"code": 404, "message": "portal app not found"}`,
 					},
 				},
 			},
-			endpointID:         "endpoint_not_found",
-			mockEndpointReturn: &proto.GatewayEndpoint{},
+			portalAppID:         "portal_app_not_found",
+			mockPortalAppReturn: nil,
 		},
 		{
-			name: "should return denied check response if user is not authorized to access endpoint using API key auth",
+			name: "should return denied check response if user is not authorized to access portal app using API key auth",
 			checkReq: &envoy_auth.CheckRequest{
 				Attributes: &envoy_auth.AttributeContext{
 					Request: &envoy_auth.AttributeContext_Request{
 						Http: &envoy_auth.AttributeContext_HttpRequest{
-							Path: "/v1/endpoint_api_key",
+							Path: "/v1/portal_app_api_key",
 							Headers: map[string]string{
-								reqHeaderAPIKey: "api_key_123",
+								authHeaderKey: "api_key_123",
 							},
 						},
 					},
@@ -286,15 +260,11 @@ func Test_Check(t *testing.T) {
 					},
 				},
 			},
-			endpointID: "endpoint_api_key",
-			mockEndpointReturn: &proto.GatewayEndpoint{
-				EndpointId: "endpoint_api_key",
-				Auth: &proto.Auth{
-					AuthType: &proto.Auth_StaticApiKey{
-						StaticApiKey: &proto.StaticAPIKey{
-							ApiKey: "api_key_not_this_one",
-						},
-					},
+			portalAppID: "portal_app_api_key",
+			mockPortalAppReturn: &store.PortalApp{
+				PortalAppID: "portal_app_api_key",
+				Auth: &store.Auth{
+					APIKey: "api_key_not_this_one",
 				},
 			},
 		},
@@ -307,15 +277,15 @@ func Test_Check(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			mockStore := NewMockEndpointStore(ctrl)
-			if test.endpointID != "" {
-				mockStore.EXPECT().GetGatewayEndpoint(test.endpointID).Return(test.mockEndpointReturn, test.mockEndpointReturn.EndpointId != "")
+			mockStore := NewMockPortalAppStore(ctrl)
+			if test.portalAppID != "" {
+				mockStore.EXPECT().GetPortalApp(test.portalAppID).Return(test.mockPortalAppReturn, test.mockPortalAppReturn != nil)
 			}
 
 			authHandler := &AuthHandler{
 				Logger: polyzero.NewLogger(),
 
-				EndpointStore:    mockStore,
+				PortalAppStore:   mockStore,
 				APIKeyAuthorizer: &APIKeyAuthorizer{},
 			}
 
