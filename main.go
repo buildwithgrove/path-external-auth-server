@@ -63,6 +63,11 @@ func main() {
 	}
 
 	// Create a new gRPC server for handling auth requests from GUARD
+	// using Envoy Proxy's `ext_authz` HTTP Filter.
+	//
+	// See:
+	//    - https://gateway.envoyproxy.io/docs/tasks/security/ext-auth/
+	//    - https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter
 	grpcServer := grpc.NewServer()
 
 	// Register proto server

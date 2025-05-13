@@ -1,5 +1,5 @@
 <div align="center">
-<h1>PADS<br/>Grove Portal Database Compatibility</h1>
+<h1>PEAS<br/>Grove Portal Database Compatibility</h1>
 <img src="https://storage.googleapis.com/grove-brand-assets/Presskit/Logo%20Joined-2.png" alt="Grove logo" width="500"/>
 
 </div>
@@ -24,15 +24,15 @@
 <br/>
 
 The [Grove Postgres Driver schema file](https://github.com/buildwithgrove/path-auth-data-server/blob/main/postgres/grove/sqlc/grove_schema.sql)
-uses a subset of tables from the existing Grove Portal database schema, allowing `PATH` to source its authorization data from the existing Grove Portal DB by way of `PADS`.
+uses a subset of tables from the existing Grove Portal database schema, allowing `PATH` to source its authorization data from the existing Grove Portal database.
 
-It converts the data stored in the `portal_applications` table and its associated tables into the `proto.PortalApp` format expected by `PEAS`.
+It converts the data stored in the `portal_applications` table and its associated tables into the `PortalApp` format expected by `PEAS`.
 
 It also listens for updates to the Grove Portal DB and streams updates to `PEAS` in real time as changes are made to the connected Postgres database.
 
 ### Entity Relationship Diagram
 
-This ERD shows the subset of tables from the full Grove Portal DB schema that are used by the Grove Postgres Driver in PADS.
+This ERD shows the subset of tables from the full Grove Portal DB schema that are used by the Grove Postgres Driver in PEAS.
 
 ```mermaid
 erDiagram
@@ -60,6 +60,7 @@ erDiagram
         VARCHAR(24) portal_app_id
         BOOLEAN is_delete
         TIMESTAMP changed_at
+        TIMESTAMP processed_at
     }
 
     ACCOUNTS ||--o{ PORTAL_APPLICATIONS : "id"

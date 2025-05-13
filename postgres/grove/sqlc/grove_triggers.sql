@@ -1,11 +1,10 @@
--- This file contains the triggers that listen for changes to the Grove Portal DB and stream updates to PEAS over gRPC.
+-- This file contains the triggers that listen for changes to the Grove Portal DB and update PEAS' portal app store.
 
 -- These triggers are used to listen for changes to Portal Applications and their associated tables.
 -- When updates are detected, the triggers insert a row into the `portal_application_changes` table.
 -- The `log_portal_application_changes` function is then called to handle the update.
 -- The function sends a minimal notification to the `portal_application_changes` channel, which is handled by the `portalApplicationChangesChannel` in the Postgres data source.
 -- See implementation here: https://github.com/buildwithgrove/path-auth-data-server/blob/main/postgres/grove/data_source.go#L163
--- PADS then streams the updated data to PEAS over gRPC, which updates its Gateway PortalApps store used to authorize requests to PATH.
 
 -- /*-------------------- Listener Updates --------------------*/
 

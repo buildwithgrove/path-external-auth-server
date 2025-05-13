@@ -5,6 +5,16 @@
 </div>
 <br/>
 
+- [Introduction](#introduction)
+  - [Docker Image](#docker-image)
+  - [Architecture Diagram](#architecture-diagram)
+  - [`PortalApp` Structure](#portalapp-structure)
+- [Request Headers](#request-headers)
+- [Rate Limiting Implementation](#rate-limiting-implementation)
+- [Envoy Gateway Integration](#envoy-gateway-integration)
+- [PEAS Environment Variables](#peas-environment-variables)
+
+
 ## Introduction
 
 **PEAS** (PATH External Auth Server) is an external authorization server that can be used to authorize requests to the [PATH Gateway](https://github.com/buildwithgrove/path). It is part of the GUARD authorization system for PATH and runs in the PATH Kubernetes cluster.
@@ -16,38 +26,95 @@ docker pull ghcr.io/buildwithgrove/path-external-auth-server:latest
 ```
 
 - [PEAS GHCR Package](https://github.com/orgs/buildwithgrove/packages/container/package/path-external-auth-server)
+### Architecture Diagram
+
+```mermaid
+graph TD
+    User[/"<big>PATH<br>User</big>"\]
+    Envoy[<big>Envoy Proxy</big>]
+
+    AUTH["PEAS (PATH External Auth Server)"]
+    AUTH_DECISION{Did<br>Authorize<br>Request?}
+    PATH[<big>PATH</big>]
+
+    Error[[Error Returned to User]]
+    Result[[Result Returned to User]]
+
+    GroveDB[("Grove Portal Database<br>(Postgres)")]
+
+    subgraph AUTH["PEAS<br/>PATH External Auth Server"]
+    end
+
+    User -->|1.Send Request| Envoy
+    Envoy -.->|2.Authorization Check<br>gRPC| AUTH
+    AUTH -.->|3.Authorization Result<br>gRPC| Envoy
+    Envoy --> AUTH_DECISION
+    AUTH_DECISION -->|4.No <br> Forward Request| Error
+    AUTH_DECISION -->|4.Yes <br> Forward Request| PATH
+    PATH -->|5.Response| Result
+
+    GroveDB <-->|Postgres Connection| AUTH
+```
 
 ### `PortalApp` Structure
 
-PEAS receives a list of `PortalApps` that define which portal appsare authorized to use the PATH Gateway.
+PEAS manages authentication and assigning rate limiting headers for portal apps that are defined with the following structure:
 
-- [`PortalApp` protobuf definition.](https://github.com/buildwithgrove/path-external-auth-server/blob/main/proto/gateway_endpoint.proto)
+```go
+// PortalApp represents a single portal app for a user's account.
+type PortalApp struct {
+    // Used to identify the PortalApp when making a service request.
+    PortalAppID PortalAppID
+    // Unique identifier for the user's account
+    AccountID AccountID
+    // The authorization settings for the PortalApp.
+    Auth *Auth
+    // Rate Limiting settings for the PortalApp.
+    RateLimit *RateLimit
+}
 
-`PortalApp` data is received from a `remote gRPC server` that may be implemented by a PATH gateway operator in any way they see fit. The only requirement is that it adhere to the to spec defined in the protobuf definition. 
+// Auth represents the authorization settings for a PortalApp.
+// Auth can be one of:
+//   - NoAuth: The portal app does not require authorization (no fields are set)
+//   - APIKey: The portal app uses an API key for authorization
+type Auth struct {
+    APIKey string
+}
+
+// RateLimit contains rate limiting settings for a PortalApp.
+type RateLimit struct {
+    PlanType         PlanType
+    MonthlyUserLimit int32
+}
+```
+
+`PortalApp` data is sourced from a Postgres database compatible with the Grove Portal Database. For more information about the Grove Postgres integration, see the [Grove Postgres README](./postgres/grove/README.md).
 
 ## Request Headers
 
 PEAS adds the following headers to authorized requests before forwarding them to the upstream service:
 
-| Header         | Contents                                                 | Included For All Requests             | Example Value |
-| -------------- | -------------------------------------------------------- | ------------------------------------- | ------------- |
-| `PortalApp-Id` | The portal app ID of the authorized portal app           | ✅                                     | "a12b3c4d"    |
-| `Account-Id`   | The account ID associated with the portal app            | ✅                                     | "3f4g2js2"    |
-| `Rl-Plan-Free` | The portal app ID for rate limiting purposes (PLAN_FREE) | ❌ (Only for rate-limited portal apps) | "a12b3c4d"    |
+| Header                  | Contents                                                                                  | Included For All Requests                                            | Example Value |
+| ----------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------- |
+| `Portal-Application-ID` | The portal app ID of the authorized portal app                                            | ✅                                                                    | "a12b3c4d"    |
+| `Portal-Account-ID`     | The account ID associated with the portal app                                             | ✅                                                                    | "3f4g2js2"    |
+| `Rl-Plan-Free`          | The portal app ID for rate limiting purposes (PLAN_FREE)                                  | ❌ (Only for `PLAN_FREE` portal apps)                                 | "a12b3c4d"    |
+| `Rl-User-Limit-<X>`     | The portal app ID for rate limiting purposes with a user limit *(X = relays in millions)* | ❌ (Only for `PLAN_UNLIMITED` portal apps with user-specified limits) | "a12b3c4d"    |
 
-## 🐾 PADS (PATH Auth Data Server)
+## Rate Limiting Implementation
 
-PADS provides data from either a static YAML file or a Grove-specific Postgres database implementation.
+PEAS provides rate limiting capabilities through the following mechanisms:
 
-- [PADS Repository](https://github.com/buildwithgrove/path-auth-data-server)
+1. **Plan-Based Rate Limiting**: For `PLAN_FREE` portal apps, PEAS will add headers like `Rl-Plan-Free: <portal-app-id>`.
 
-```bash
-docker pull ghcr.io/buildwithgrove/path-auth-data-server:latest
-```
+2. **User-Based Rate Limiting**: For `PLAN_UNLIMITED` portal apps with user-specified monthly limits, PEAS adds headers based on the limit in millions:
+   - 10 million monthly user limit: `Rl-User-Limit-10: <portal-app-id>`
+   - 40 million monthly user limit: `Rl-User-Limit-40: <portal-app-id>`
+   - etc..
 
-- [PADS GHCR Package](https://github.com/orgs/buildwithgrove/packages/container/package/path-auth-data-server)
+These headers are processed by the Envoy rate limiter configured in the GUARD system, allowing for granular control over request rates.
 
-## Envoy Gateway Docs
+## Envoy Gateway Integration
 
 PEAS exposes a gRPC service that adheres to the spec expected by Envoy Proxy's `ext_authz` HTTP Filter.
 
@@ -65,8 +132,8 @@ For more information see:
 
 PEAS is configured via environment variables.
 
-| Variable                      | Required | Type   | Description                                                                                                                    | Example          | Default Value |
-| ----------------------------- | -------- | ------ | ------------------------------------------------------------------------------------------------------------------------------ | ---------------- | ------------- |
-| GRPC_HOST_PORT                | ✅        | string | The host and port for the remote gRPC server connection that provides the PortalApp data. Must adhere to a `host:port` format. | guard-pads:10002 | -             |
-| GRPC_USE_INSECURE_CREDENTIALS | ❌        | bool   | Whether to use insecure credentials for the gRPC connection. Must be `true` if the remote gRPC server is not TLS-enabled.      | `true`           | `false`       |
-| PORT                          | ❌        | int    | The port to run the external auth server on.                                                                                   | 10001            | 10001         |
+| Variable                   | Required | Type   | Description                                                           | Example                                              | Default Value |
+| -------------------------- | -------- | ------ | --------------------------------------------------------------------- | ---------------------------------------------------- | ------------- |
+| POSTGRES_CONNECTION_STRING | ✅        | string | The PostgreSQL connection string for the database with PortalApp data | postgresql://username:password@localhost:5432/dbname | -             |
+| PORT                       | ❌        | int    | The port to run the external auth server on                           | 10001                                                | 10001         |
+| LOGGER_LEVEL               | ❌        | string | The log level to use for the external auth server                     | info                                                 | info          |
