@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/codes"
 
 	"github.com/buildwithgrove/path-external-auth-server/proto"
+	"github.com/buildwithgrove/path-external-auth-server/ratelimit"
 )
 
 const (
@@ -31,25 +32,6 @@ const (
 
 	errBody = `{"code": %d, "message": "%s"}`
 )
-
-// Set only on endpoints with plan types that should be rate limited
-// The key is the plan type as specified in the database.
-// The value is the header key to be matched in the GUARD configuration.
-//
-// DEV_NOTE: New plans from the database should be added to this map.
-//
-// Documentation reference:
-// https://gateway.envoyproxy.io/docs/tasks/traffic/global-rate-limit/#rate-limit-distinct-users-except-admin
-const (
-	dbPlanFree     = "PLAN_FREE"    // The plan type as specified in the database
-	planFreeHeader = "Rl-Plan-Free" // The header key to be matched in the GUARD configuration
-)
-
-// Map used to convert the plan type as specified in the database to the
-// header key to be matched in the GUARD configuration.
-var rateLimitedPlanTypeHeaders = map[string]string{
-	dbPlanFree: planFreeHeader,
-}
 
 // The EndpointStore interface contains an in-memory store of GatewayEndpoints
 // and their associated data from the PADS (PATH Auth Data Server).
@@ -179,19 +161,9 @@ func (a *AuthHandler) getHTTPHeaders(gatewayEndpoint *proto.GatewayEndpoint) []*
 		},
 	}
 
-	// Set rate limit headers if the endpoint should be rate limited
-	if planType := metadata.GetPlanType(); planType != "" {
-		// Only plans that are configured to be rate limited should have a rate limit header
-		if rateLimitHeader, ok := rateLimitedPlanTypeHeaders[planType]; ok {
-			// Set the rate header with the endpoint ID
-			// eg. "Rate-Limit-Plan-Free: a12b3c4d"
-			headers = append(headers, &envoy_core.HeaderValueOption{
-				Header: &envoy_core.HeaderValue{
-					Key:   rateLimitHeader,
-					Value: endpointID,
-				},
-			})
-		}
+	// Check if endpoint should be rate limited and add the rate limit header if so
+	if rateLimitHeader := ratelimit.GetRateLimitHeader(endpointID, metadata); rateLimitHeader != nil {
+		headers = append(headers, rateLimitHeader)
 	}
 
 	return headers

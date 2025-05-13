@@ -97,8 +97,9 @@ message Metadata {
   string account_id = 2;       // Unique identifier for the user's account
   string user_id = 3;          // Identifier for a specific user within the system
   string plan_type = 4;        // Subscription or account plan type (e.g., "Free", "Pro", "Enterprise")
-  string email = 5;            // The email address associated with the GatewayEndpoint
-  string environment = 6;      // The environment the GatewayEndpoint is in (e.g., "development", "staging", "production")
+  int32 monthly_relay_limit = 5; // OPTIONAL - A user-set value that limits the number of relays a user can make in a month
+  string email = 6;            // The email address associated with the GatewayEndpoint
+  string environment = 7;      // The environment the GatewayEndpoint is in (e.g., "development", "staging", "production")
 }
 
 // An Empty message is used to indicate that a field is not set.
