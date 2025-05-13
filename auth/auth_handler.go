@@ -143,7 +143,7 @@ func (a *AuthHandler) getHTTPHeaders(gatewayPortalApp *store.PortalApp) []*envoy
 			},
 		},
 		// Set account ID header on all requests
-		// eg. "Account-Id: 3f4g2js2"
+		// eg. "Portal-Account-ID: 3f4g2js2"
 		{
 			Header: &envoy_core.HeaderValue{
 				Key:   reqHeaderAccountID,
