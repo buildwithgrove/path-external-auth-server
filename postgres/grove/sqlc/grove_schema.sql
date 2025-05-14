@@ -9,19 +9,19 @@
 
 -- IMPORTANT - All tables and columns defined in this file exist in the existing Grove Portal DB.
 
--- The `portal_applications` and its associated tables are converted to the `proto.PortalApp` format.
--- The inline comments indicate the fields in the `proto.PortalApp` that correspond to the columns in the `portal_applications` table.
+-- The `portal_applications` and its associated tables are converted to the `store.PortalApp` format.
+-- The inline comments indicate the fields in the `store.PortalApp` that correspond to the columns in the `portal_applications` table.
 
 -- Accounts Tables
 CREATE TABLE accounts (
-    id VARCHAR(10) PRIMARY KEY, -- PortalApp.Metadata.AccountId
-    plan_type VARCHAR(25), -- PortalApp.Metadata.PlanType
-    monthly_user_limit INT -- PortalApp.Metadata.MonthlyUserLimit
+    id VARCHAR(10) PRIMARY KEY, -- PortalApp.AccountID
+    plan_type VARCHAR(25), -- PortalApp.RateLimit.PlanType
+    monthly_user_limit INT -- PortalApp.RateLimit.MonthlyUserLimit
 );
 
 -- Portal Application Tables
 CREATE TABLE portal_applications (
-    id VARCHAR(24) PRIMARY KEY UNIQUE, -- PortalApp.PortalAppId
+    id VARCHAR(24) PRIMARY KEY UNIQUE, -- PortalApp.PortalAppID
     account_id VARCHAR(10) REFERENCES accounts(id),
     deleted BOOLEAN NOT NULL DEFAULT false,
     deleted_at TIMESTAMPTZ NULL
@@ -31,6 +31,6 @@ CREATE TABLE portal_applications (
 CREATE TABLE portal_application_settings (
     id SERIAL PRIMARY KEY,
     application_id VARCHAR(24) NOT NULL UNIQUE REFERENCES portal_applications(id) ON DELETE CASCADE,
-    secret_key VARCHAR(64), -- PortalApp.Auth.AuthType.StaticApiKey.ApiKey
+    secret_key VARCHAR(64), -- PortalApp.Auth.APIKey
     secret_key_required BOOLEAN
 );

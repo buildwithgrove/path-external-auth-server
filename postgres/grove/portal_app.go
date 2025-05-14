@@ -21,7 +21,7 @@ type portalApplicationRow struct {
 // sqlcPortalAppsToPortalAppRow (not the plurality of Apps) converts a row from the
 // `SelectPortalAppsRow` query to the intermediate portalApplicationRow struct.
 // This is necessary because SQLC generates a specific struct for each query, which needs
-// to be converted to a common struct before converting to the proto.PortalApp struct.
+// to be converted to a common struct before converting to the store.PortalApp struct.
 func sqlcPortalAppsToPortalAppRow(r sqlc.SelectPortalAppsRow) *portalApplicationRow {
 	return &portalApplicationRow{
 		ID:                r.ID,
@@ -36,7 +36,7 @@ func sqlcPortalAppsToPortalAppRow(r sqlc.SelectPortalAppsRow) *portalApplication
 // sqlcPortalAppToPortalAppRow (not the singularity of App) converts a row from the
 // `SelectPortalAppRow` query to the intermediate portalApplicationRow struct.
 // This is necessary because SQLC generates a specific struct for each query, which needs
-// to be converted to a common struct before converting to the proto.PortalApp struct.
+// to be converted to a common struct before converting to the store.PortalApp struct.
 func sqlcPortalAppToPortalAppRow(r sqlc.SelectPortalAppRow) *portalApplicationRow {
 	return &portalApplicationRow{
 		ID:                r.ID,

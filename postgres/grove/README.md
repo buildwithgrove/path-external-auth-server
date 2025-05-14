@@ -39,6 +39,7 @@ erDiagram
     ACCOUNTS {
         VARCHAR(10) id PK
         VARCHAR(25) plan_type FK
+        INT monthly_user_limit
     }
 
     PORTAL_APPLICATIONS {
