@@ -132,7 +132,7 @@ func (a *AuthHandler) authPortalApp(headers map[string]string, portalApp *store.
 func (a *AuthHandler) getHTTPHeaders(portalApp *store.PortalApp) []*envoy_core.HeaderValueOption {
 	headers := []*envoy_core.HeaderValueOption{
 		// Set portal app ID header on all requests
-		// eg. "PortalApp-Id: a12b3c4d"
+		// eg. "Portal-Application-ID: a12b3c4d"
 		{
 			Header: &envoy_core.HeaderValue{
 				Key:   reqHeaderPortalAppID,
