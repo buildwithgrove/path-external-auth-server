@@ -18,40 +18,40 @@ func Test_GetPortalApp(t *testing.T) {
 		update                 *PortalAppUpdate
 	}{
 		{
-			name:                   "should return gateway portal app when found",
+			name:                   "should return portal app when found",
 			portalAppID:            "portal_app_1_static_key",
 			expectedPortalApp:      getTestPortalApps()["portal_app_1_static_key"],
 			expectedPortalAppFound: true,
 		},
 		{
-			name:                   "should return different gateway portal app when found",
+			name:                   "should return different portal app when found",
 			portalAppID:            "portal_app_2_no_auth",
 			expectedPortalApp:      getTestPortalApps()["portal_app_2_no_auth"],
 			expectedPortalAppFound: true,
 		},
 		{
-			name:                   "should return brand new gateway portal app when update is received for new portal",
+			name:                   "should return brand new portal app when update is received for new portal",
 			portalAppID:            "portal_app_3_static_key",
 			update:                 getTestUpdate("portal_app_3_static_key"),
 			expectedPortalApp:      getTestUpdate("portal_app_3_static_key").PortalApp,
 			expectedPortalAppFound: true,
 		},
 		{
-			name:                   "should return updated existing gateway portal app when update is received for existing portal",
+			name:                   "should return updated existing portal app when update is received for existing portal",
 			portalAppID:            "portal_app_2_no_auth",
 			update:                 getTestUpdate("portal_app_2_no_auth"),
 			expectedPortalApp:      getTestUpdate("portal_app_2_no_auth").PortalApp,
 			expectedPortalAppFound: true,
 		},
 		{
-			name:                   "should not return gateway portal app when update is received to delete portal",
+			name:                   "should not return portal app when update is received to delete portal",
 			portalAppID:            "portal_app_1_static_key",
 			update:                 getTestUpdate("portal_app_1_static_key"),
 			expectedPortalApp:      nil,
 			expectedPortalAppFound: false,
 		},
 		{
-			name:                   "should return false when gateway portal app not found",
+			name:                   "should return false when portal app not found",
 			portalAppID:            "portal_app_3_static_key",
 			expectedPortalApp:      nil,
 			expectedPortalAppFound: false,
@@ -86,28 +86,28 @@ func Test_GetPortalApp(t *testing.T) {
 				time.Sleep(50 * time.Millisecond)
 			}
 
-			gatewayPortalApp, found := store.GetPortalApp(test.portalAppID)
+			portalApp, found := store.GetPortalApp(test.portalAppID)
 			c.Equal(test.expectedPortalAppFound, found)
 
 			if test.expectedPortalApp != nil {
-				c.Equal(test.expectedPortalApp.PortalAppID, gatewayPortalApp.PortalAppID)
+				c.Equal(test.expectedPortalApp.PortalAppID, portalApp.PortalAppID)
 
 				// Compare Auth details if present
 				if test.expectedPortalApp.Auth != nil {
-					c.Equal(test.expectedPortalApp.Auth.APIKey, gatewayPortalApp.Auth.APIKey)
+					c.Equal(test.expectedPortalApp.Auth.APIKey, portalApp.Auth.APIKey)
 				} else {
-					c.Nil(gatewayPortalApp.Auth)
+					c.Nil(portalApp.Auth)
 				}
 
 				// Compare RateLimit if present
 				if test.expectedPortalApp.RateLimit != nil {
-					c.Equal(test.expectedPortalApp.RateLimit.PlanType, gatewayPortalApp.RateLimit.PlanType)
-					c.Equal(test.expectedPortalApp.RateLimit.MonthlyUserLimit, gatewayPortalApp.RateLimit.MonthlyUserLimit)
+					c.Equal(test.expectedPortalApp.RateLimit.PlanType, portalApp.RateLimit.PlanType)
+					c.Equal(test.expectedPortalApp.RateLimit.MonthlyUserLimit, portalApp.RateLimit.MonthlyUserLimit)
 				} else {
-					c.Nil(gatewayPortalApp.RateLimit)
+					c.Nil(portalApp.RateLimit)
 				}
 			} else {
-				c.Nil(gatewayPortalApp)
+				c.Nil(portalApp)
 			}
 
 			// Close the channel to end the test cleanly

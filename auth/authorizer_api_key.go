@@ -12,7 +12,7 @@ const (
 type APIKeyAuthorizer struct{}
 
 // authorizeRequest authorizes a request using an API key.
-func (a *APIKeyAuthorizer) authorizeRequest(headers map[string]string, gatewayPortalApp *store.PortalApp) error {
+func (a *APIKeyAuthorizer) authorizeRequest(headers map[string]string, portalApp *store.PortalApp) error {
 	// Extract the API key from the Authorization header
 	headerValue := headers[authHeaderKey]
 	if headerValue == "" {
@@ -26,7 +26,7 @@ func (a *APIKeyAuthorizer) authorizeRequest(headers map[string]string, gatewayPo
 	}
 
 	// Compare the API key with the expected value
-	if apiKey != gatewayPortalApp.Auth.APIKey {
+	if apiKey != portalApp.Auth.APIKey {
 		return errUnauthorized
 	}
 

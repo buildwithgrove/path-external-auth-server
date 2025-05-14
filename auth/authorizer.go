@@ -13,5 +13,5 @@ var errUnauthorized = fmt.Errorf("unauthorized")
 // Authorizer is an interface for authorizing requests against a PortalApp.
 type Authorizer interface {
 	// authorizeRequest authorizes a request using the provided headers and a PortalApp.
-	authorizeRequest(headers map[string]string, gatewayPortalApp *store.PortalApp) error
+	authorizeRequest(headers map[string]string, portalApp *store.PortalApp) error
 }

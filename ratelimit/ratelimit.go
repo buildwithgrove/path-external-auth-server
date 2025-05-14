@@ -22,24 +22,24 @@ const (
 	PlanFreeHeader = "Rl-Plan-Free" // The header key to be matched in the GUARD configuration
 )
 
-// Map used to convert the plan type as specified in the database to the
-// header key to be matched in the GUARD configuration.
-var rateLimitedPlanTypeHeaders = map[string]string{
+// Map used to convert the plan type as specified in the database
+// to the header key to be matched in the GUARD configuration.
+var rateLimitedPlanTypeHeaders = map[store.PlanType]string{
 	DBPlanFree: PlanFreeHeader, // PLAN_FREE: Rl-Plan-Free
 }
 
-// Prefix for user-specific rate limit headers
-// where the integer value is the monthly user limit in millions
+// Prefix for user-specific rate limit headers where the
+// integer value is the monthly user limit in millions.
 //
-// Example:
+// Examples:
 //   - monthlyUserLimit of 40,000,000 returns "Rl-User-Limit-40"
 //   - monthlyUserLimit of 10,000,000 returns "Rl-User-Limit-10"
 const userLimitHeaderPrefix = "Rl-User-Limit-%d"
 
-// getUserLimitHeader generates a rate limit header based on the monthly user limit.
-// `monthlyUserLimit` must be set in intervals of 1,000,000.
+// getUserLimitHeader generates a rate limit header based on the monthly
+// user limit. `monthlyUserLimit` must be set in intervals of 1,000,000.
 //
-// Example:
+// Examples:
 //   - monthlyUserLimit of 40,000,000 returns "Rl-User-Limit-40"
 //   - monthlyUserLimit of 10,000,000 returns "Rl-User-Limit-10"
 func getUserLimitHeader(monthlyUserLimit int32) string {
@@ -48,46 +48,40 @@ func getUserLimitHeader(monthlyUserLimit int32) string {
 	return fmt.Sprintf(userLimitHeaderPrefix, millionValue)
 }
 
-// GetRateLimitHeader returns the rate limit header for the given portal app ID
-// and rate limit configuration.
+// GetRateLimitHeader returns the rate limit header for
+// the given portal app ID and rate limit configuration.
 //
 // Examples:
 //   - PLAN_FREE: "Rl-Plan-Free: <portal-app-id>"
 //   - 40 million monthly user limit: "Rl-User-Limit-40: <portal-app-id>"
 //   - 10 million monthly user limit: "Rl-User-Limit-10: <portal-app-id>"
-func GetRateLimitHeader(
-	portalAppID string,
-	rateLimitData *store.RateLimit,
-) *envoy_core.HeaderValueOption {
-	if rateLimitData == nil {
+func GetRateLimitHeader(portalApp *store.PortalApp) *envoy_core.HeaderValueOption {
+	// Return nil if the portal app is not rate limited.
+	if portalApp.RateLimit == nil {
 		return nil
 	}
 
-	planType := string(rateLimitData.PlanType)
+	rateLimit := portalApp.RateLimit
 
-	// First check if the request is for a rate limited plan, eg. PLAN_FREE
-	// If so, the header will be set to the planFreeHeader
+	// First check if the portal app is rate limited by plan type.
 	// e.g. "Rl-Plan-Free: <portal-app-id>"
-	if planType != "" {
-		if rateLimitHeader, ok := rateLimitedPlanTypeHeaders[planType]; ok {
-			return &envoy_core.HeaderValueOption{
-				Header: &envoy_core.HeaderValue{
-					Key:   rateLimitHeader,
-					Value: portalAppID,
-				},
-			}
+	if rateLimitHeader, ok := rateLimitedPlanTypeHeaders[rateLimit.PlanType]; ok {
+		return &envoy_core.HeaderValueOption{
+			Header: &envoy_core.HeaderValue{
+				Key:   rateLimitHeader,
+				Value: string(portalApp.PortalAppID),
+			},
 		}
 	}
 
-	// Then check if the request is for an portal app with a user-specific monthly user limit
-	// If so, the header will be set to the user's monthly user limit in millions
+	// Then check if the portal app is rate limited by user-specified monthly limit.
 	// e.g. "Rl-User-Limit-40: <portal-app-id>" = 40 million monthly user limit
-	if rateLimitData.MonthlyUserLimit > 0 {
-		header := getUserLimitHeader(rateLimitData.MonthlyUserLimit)
+	if rateLimit.MonthlyUserLimit > 0 {
+		rateLimitHeader := getUserLimitHeader(rateLimit.MonthlyUserLimit)
 		return &envoy_core.HeaderValueOption{
 			Header: &envoy_core.HeaderValue{
-				Key:   header,
-				Value: portalAppID,
+				Key:   rateLimitHeader,
+				Value: string(portalApp.PortalAppID),
 			},
 		}
 	}

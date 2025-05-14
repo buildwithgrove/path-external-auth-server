@@ -53,8 +53,8 @@ func (c *portalAppStore) GetPortalApp(portalAppID PortalAppID) (*PortalApp, bool
 	c.portalAppsMu.RLock()
 	defer c.portalAppsMu.RUnlock()
 
-	gatewayPortalApp, ok := c.portalApps[portalAppID]
-	return gatewayPortalApp, ok
+	portalApp, ok := c.portalApps[portalAppID]
+	return portalApp, ok
 }
 
 // initializeStore requests the initial data from the data source to populate the store.

@@ -48,7 +48,7 @@ var postgresConnectionStringRegex = regexp.MustCompile(`^postgres(?:ql)?:\/\/[^:
 NewGrovePostgresDriver returns a PostgreSQL data source that implements the store.DataSource interface.
 
 The data source connects to a PostgreSQL database and:
-1. Provides methods to fetch initial gateway portal app data
+1. Provides methods to fetch initial portal app data
 2. Provides a channel for receiving portal app updates
 3. Listens for changes from the database
 */

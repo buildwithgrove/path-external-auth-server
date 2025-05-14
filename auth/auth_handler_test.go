@@ -205,7 +205,7 @@ func Test_Check(t *testing.T) {
 			},
 		},
 		{
-			name: "should return denied check response if gateway portal app not found",
+			name: "should return denied check response if portal app not found",
 			checkReq: &envoy_auth.CheckRequest{
 				Attributes: &envoy_auth.AttributeContext{
 					Request: &envoy_auth.AttributeContext_Request{

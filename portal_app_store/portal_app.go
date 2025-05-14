@@ -8,20 +8,22 @@ type (
 
 // PortalApp represents a single portal app for a user's account.
 type PortalApp struct {
-	// Used to identify the PortalApp when making a service request.
+	// Unique identifier for the PortalApp.
 	PortalAppID PortalAppID
-	// Unique identifier for the user's account
+	// Unique identifier for the PortalApp's account.
 	AccountID AccountID
 	// The authorization settings for the PortalApp.
+	// Auth can be one of:
+	//   - NoAuth: The portal app does not require authorization (Auth will be nil)
+	//   - APIKey: The portal app uses an API key for authorization
 	Auth *Auth
 	// Rate Limiting settings for the PortalApp.
+	// If the portal app is not rate limited, RateLimit will be nil.
 	RateLimit *RateLimit
 }
 
 // Auth represents the authorization settings for a PortalApp.
-// Auth can be one of:
-//   - NoAuth: The portal app does not require authorization (no fields are set)
-//   - APIKey: The portal app uses an API key for authorization
+// Only API key auth is supported by the Grove Portal.
 type Auth struct {
 	APIKey string
 }
@@ -32,7 +34,7 @@ type RateLimit struct {
 	MonthlyUserLimit int32
 }
 
-// PortalAppUpdate represents an update to a gateway portal app in the store
+// PortalAppUpdate represents an update to a portal app in the store
 type PortalAppUpdate struct {
 	// The ID of the portal app being updated
 	PortalAppID PortalAppID
