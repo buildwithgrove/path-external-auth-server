@@ -58,14 +58,17 @@ func getUserLimitHeader(monthlyRelayLimit int32) string {
 //   - PLAN_FREE: "Rl-Plan-Free: <endpoint-id>"
 //   - 40 million monthly relay limit: "Rl-User-Limit-40: <endpoint-id>"
 //   - 10 million monthly relay limit: "Rl-User-Limit-10: <endpoint-id>"
-func GetRateLimitHeader(endpointID string, metadata *proto.Metadata) *envoy_core.HeaderValueOption {
+func GetRateLimitHeader(gatewayEndpoint *proto.GatewayEndpoint) *envoy_core.HeaderValueOption {
+	metadata := gatewayEndpoint.GetMetadata()
+
 	planType := metadata.GetPlanType()
 	if planType == "" {
 		return nil
 	}
 
+	endpointID := gatewayEndpoint.GetEndpointId()
+
 	// First check if the request is for a rate limited plan, eg. PLAN_FREE
-	// If so, the header will be set to the planFreeHeader
 	// e.g. "Rl-Plan-Free: <endpoint-id>"
 	if rateLimitHeader, ok := rateLimitedPlanTypeHeaders[planType]; ok {
 		return &envoy_core.HeaderValueOption{
@@ -76,9 +79,8 @@ func GetRateLimitHeader(endpointID string, metadata *proto.Metadata) *envoy_core
 		}
 	}
 
-	// Then check if the request is for an endpoint with a user-specific monthly relay limit
-	// If so, the header will be set to the user's monthly relay limit in millions
-	// e.g. "Rl-User-Limit-40: <endpoint-id>" = 40 million monthly relay limit
+	// Then check if the request is for an gateway endpoint with a user-specific monthly user limit
+	// e.g. "Rl-User-Limit-40: <endpoint-id>" = 40 million monthly user limit
 	if monthlyRelayLimit := metadata.GetMonthlyRelayLimit(); monthlyRelayLimit > 0 {
 		header := getUserLimitHeader(monthlyRelayLimit)
 		return &envoy_core.HeaderValueOption{
