@@ -47,7 +47,7 @@ func Test_Check(t *testing.T) {
 						Headers: []*envoy_core.HeaderValueOption{
 							{Header: &envoy_core.HeaderValue{Key: reqHeaderEndpointID, Value: "endpoint_free"}},
 							{Header: &envoy_core.HeaderValue{Key: reqHeaderAccountID, Value: "account_1"}},
-							{Header: &envoy_core.HeaderValue{Key: ratelimit.PlanFreeHeader, Value: "endpoint_free"}},
+							{Header: &envoy_core.HeaderValue{Key: ratelimit.PlanFree_RequestHeader, Value: "endpoint_free"}},
 						},
 					},
 				},
@@ -60,7 +60,7 @@ func Test_Check(t *testing.T) {
 				},
 				Metadata: &proto.Metadata{
 					AccountId: "account_1",
-					PlanType:  ratelimit.DBPlanFree,
+					PlanType:  ratelimit.PlanFree_DatabaseType,
 				},
 			},
 		},

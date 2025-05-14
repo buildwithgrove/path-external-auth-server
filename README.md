@@ -30,11 +30,11 @@ PEAS receives a list of `GatewayEndpoints` that define which endpoints are autho
 
 PEAS adds the following headers to authorized requests before forwarding them to the upstream service:
 
-| Header                  | Contents                                               | Included For All Requests            | Example Value |
-| ----------------------- | ------------------------------------------------------ | ------------------------------------ | ------------- |
-| `Portal-Application-ID` | The endpoint ID of the authorized endpoint             | ✅                                   | "a12b3c4d"    |
-| `Account-Id`            | The account ID associated with the endpoint            | ✅                                   | "3f4g2js2"    |
-| `Rl-Plan-Free`          | The endpoint ID for rate limiting purposes (PLAN_FREE) | ❌ (Only for rate-limited endpoints) | "a12b3c4d"    |
+| Header                  | Contents                                                        | Included For All Requests            | Example Value |
+| ----------------------- | --------------------------------------------------------------- | ------------------------------------ | ------------- |
+| `Portal-Application-ID` | The application ID (aka endpoint ID) of the authorized endpoint | ✅                                   | "a12b3c4d"    |
+| `Account-Id`            | The account ID associated with the endpoint                     | ✅                                   | "3f4g2js2"    |
+| `Rl-Plan-Free`          | The plan type for rate limiting purposes (PLAN_FREE)            | ❌ (Only for rate-limited endpoints) | "a12b3c4d"    |
 
 ## 🐾 PADS (PATH Auth Data Server)
 

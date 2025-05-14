@@ -25,11 +25,15 @@ const (
 	// Not sure the best way to do this as it is referred to in multiple disparate places (eg. GUARD Helm charts, PATH's router.go & here)
 	pathPrefix = "/v1/"
 
+	// TODO_TECHDEBT(@commoddity): Should we rename all instance of "endpoint id" to "application id"
+	// and all instance of "account id" to "user id" to align with PATH's terminology?
+
 	// The endpoint and account id need to match PATH's expected HTTP headers.
-	// See the following code section in PATH:
-	// https://github.com/buildwithgrove/path/blob/1e7b2d83294e8c406479ae5e480f4dca97414cee/gateway/observation.go#L16-L18
-	reqHeaderEndpointID = "Portal-Application-ID" // Set on all service requests
-	reqHeaderAccountID  = "Portal-Account-ID"     // Set on all service requests
+	// See the following code section in PATH: https://github.com/buildwithgrove/path/blob/1e7b2d83294e8c406479ae5e480f4dca97414cee/gateway/observation.go#L16-L18
+	// MUST be set on all service requests
+	reqHeaderEndpointID = "Portal-Application-ID"
+	// MUST be set on all service requests
+	reqHeaderAccountID = "Portal-Account-ID"
 
 	errBody = `{"code": %d, "message": "%s"}`
 )
@@ -157,7 +161,7 @@ func (a *AuthHandler) getHTTPHeaders(gatewayEndpoint *proto.GatewayEndpoint) []*
 	}
 
 	// Add rate limit header if endpoint should be rate limited.
-	if rateLimitHeader := ratelimit.GetRateLimitHeader(gatewayEndpoint); rateLimitHeader != nil {
+	if rateLimitHeader := ratelimit.GetRateLimitRequestHeader(gatewayEndpoint); rateLimitHeader != nil {
 		headers = append(headers, rateLimitHeader)
 	}
 
