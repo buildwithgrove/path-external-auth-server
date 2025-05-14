@@ -1,7 +1,8 @@
-// The auth package contains the implementation of the Envoy External Authorization gRPC service.
-// It is responsible for receiving requests from Envoy and authorizing them based on the GatewayEndpoint
-// data stored in the endpointstore package. It receives a check request from GUARD and determines if
-// the request should be authorized.
+// Package auth implements the Envoy External Authorization gRPC service.
+//
+// - Receives requests from Envoy
+// - Authorizes requests based on GatewayEndpoint data from the endpointstore package
+// - Handles check requests from GUARD to determine if a request should be authorized
 package auth
 
 import (
@@ -33,35 +34,33 @@ const (
 	errBody = `{"code": %d, "message": "%s"}`
 )
 
-// The EndpointStore interface contains an in-memory store of GatewayEndpoints
-// and their associated data from the PADS (PATH Auth Data Server).
-// See: https://github.com/buildwithgrove/path-auth-data-server
+// EndpointStore provides an in-memory store of GatewayEndpoints and their associated data from PADS (PATH Auth Data Server).
 //
-// It used to allow fast lookups of authorization data for PATH when processing requests.
+// - See: https://github.com/buildwithgrove/path-auth-data-server
+// - Enables fast lookups of authorization data for PATH when processing requests.
 type EndpointStore interface {
 	GetGatewayEndpoint(endpointID string) (*proto.GatewayEndpoint, bool)
 }
 
-// The AuthHandler struct contains the methods for processing requests from Envoy,
-// primarily the Check method that is called by Envoy for each request.
+// AuthHandler processes requests from Envoy, primarily via the Check method called for each request.
 type AuthHandler struct {
 	Logger polylog.Logger
 
-	// The EndpointStore contains an in-memory store of GatewayEndpoints
-	// and their associated data from the PADS (PATH Auth Data Server).
+	// EndpointStore provides an in-memory store of GatewayEndpoints and their associated data from the PADS (PATH Auth Data Server).
 	EndpointStore EndpointStore
 
-	// The authorizers to be used for the request
+	// Authorizers to be used for the request
 	APIKeyAuthorizer Authorizer
 }
 
-// Check satisfies the implementation of the Envoy External Authorization gRPC service.
-// It performs the following steps:
-// - Extracts the endpoint ID from the path
-// - Extracts the account user ID from the headers
-// - Fetches the GatewayEndpoint from the database
-// - Performs all configured authorization checks
-// - Returns a response with the HTTP headers set
+// Check implements the Envoy External Authorization gRPC service.
+//
+// Steps:
+// - Extract endpoint ID from the path
+// - Extract account user ID from headers
+// - Fetch GatewayEndpoint from the database
+// - Perform all configured authorization checks
+// - Return a response with HTTP headers set
 func (a *AuthHandler) Check(
 	ctx context.Context,
 	checkReq *envoy_auth.CheckRequest,
@@ -113,21 +112,22 @@ func (a *AuthHandler) Check(
 	return getOKCheckResponse(httpHeaders), nil
 }
 
-/* --------------------------------- Helpers -------------------------------- */
+// --------------------------------- Helpers ---------------------------------
 
-// getGatewayEndpoint fetches the GatewayEndpoint from the endpoint store and a bool indicating if it was found
+// getGatewayEndpoint fetches the GatewayEndpoint from the endpoint store.
+// Returns the endpoint and a bool indicating if it was found.
 func (a *AuthHandler) getGatewayEndpoint(endpointID string) (*proto.GatewayEndpoint, bool) {
 	return a.EndpointStore.GetGatewayEndpoint(endpointID)
 }
 
-// authGatewayEndpoint performs all configured authorization checks on the request
+// authGatewayEndpoint performs all configured authorization checks on the request.
 func (a *AuthHandler) authGatewayEndpoint(headers map[string]string, gatewayEndpoint *proto.GatewayEndpoint) error {
-	// Get the authorization type for the gateway endpoint
+	// Get the authorization type for the gateway endpoint.
 	authType := gatewayEndpoint.GetAuth().GetAuthType()
 
 	switch authType.(type) {
 	case *proto.Auth_NoAuth:
-		return nil // If the endpoint has no authorization requirements, return no error
+		return nil // No authorization required for this endpoint.
 
 	case *proto.Auth_StaticApiKey:
 		return a.APIKeyAuthorizer.authorizeRequest(headers, gatewayEndpoint)
@@ -137,19 +137,17 @@ func (a *AuthHandler) authGatewayEndpoint(headers map[string]string, gatewayEndp
 	}
 }
 
-// getHTTPHeaders sets all HTTP headers required by the PATH services on the request being forwarded
+// getHTTPHeaders sets all HTTP headers required by PATH services on the forwarded request.
 func (a *AuthHandler) getHTTPHeaders(gatewayEndpoint *proto.GatewayEndpoint) []*envoy_core.HeaderValueOption {
 	headers := []*envoy_core.HeaderValueOption{
-		// Set endpoint ID header on all requests
-		// eg. "Portal-Application-ID: a12b3c4d"
+		// Set endpoint ID header on all requests (e.g., "Portal-Application-ID: a12b3c4d")
 		{
 			Header: &envoy_core.HeaderValue{
 				Key:   reqHeaderEndpointID,
 				Value: gatewayEndpoint.GetEndpointId(),
 			},
 		},
-		// Set account ID header on all requests
-		// eg. "Portal-Account-ID: 3f4g2js2"
+		// Set account ID header on all requests (e.g., "Portal-Account-ID: 3f4g2js2")
 		{
 			Header: &envoy_core.HeaderValue{
 				Key:   reqHeaderAccountID,
@@ -158,7 +156,7 @@ func (a *AuthHandler) getHTTPHeaders(gatewayEndpoint *proto.GatewayEndpoint) []*
 		},
 	}
 
-	// Check if endpoint should be rate limited and add the rate limit header if so
+	// Add rate limit header if endpoint should be rate limited.
 	if rateLimitHeader := ratelimit.GetRateLimitHeader(gatewayEndpoint); rateLimitHeader != nil {
 		headers = append(headers, rateLimitHeader)
 	}
@@ -166,7 +164,7 @@ func (a *AuthHandler) getHTTPHeaders(gatewayEndpoint *proto.GatewayEndpoint) []*
 	return headers
 }
 
-// getDeniedCheckResponse returns a CheckResponse with a denied status and error message
+// getDeniedCheckResponse returns a CheckResponse with denied status and error message.
 func getDeniedCheckResponse(err string, httpCode envoy_type.StatusCode) *envoy_auth.CheckResponse {
 	return &envoy_auth.CheckResponse{
 		Status: &status.Status{
@@ -184,7 +182,7 @@ func getDeniedCheckResponse(err string, httpCode envoy_type.StatusCode) *envoy_a
 	}
 }
 
-// getOKCheckResponse returns a CheckResponse with an OK status and the provided headers
+// getOKCheckResponse returns a CheckResponse with OK status and provided headers.
 func getOKCheckResponse(headers []*envoy_core.HeaderValueOption) *envoy_auth.CheckResponse {
 	return &envoy_auth.CheckResponse{
 		Status: &status.Status{
