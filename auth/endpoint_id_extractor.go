@@ -24,7 +24,7 @@ func extractEndpointID(req *envoy_auth.AttributeContext_HttpRequest) (string, er
 
 // extractFromHeader extracts the endpoint ID from the headers.
 // It returns the endpoint ID if found and non-empty, otherwise an empty string.
-// Example: Header = "Endpoint-Id: 1a2b3c4d" -> endpointID = "1a2b3c4d"
+// Example: Header = "Portal-Application-ID: 1a2b3c4d" -> endpointID = "1a2b3c4d"
 func extractFromHeader(req *envoy_auth.AttributeContext_HttpRequest) string {
 	headers := req.GetHeaders()
 
