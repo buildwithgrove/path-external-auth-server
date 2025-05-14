@@ -1,9 +1,8 @@
 package auth
 
 import (
+	"net/http"
 	"testing"
-
-	envoy_auth "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 
 	store "github.com/buildwithgrove/path-external-auth-server/portal_app_store"
 )
@@ -11,45 +10,38 @@ import (
 func Test_extractPortalAppID(t *testing.T) {
 	tests := []struct {
 		name    string
-		request *envoy_auth.AttributeContext_HttpRequest
+		headers http.Header
+		path    string
 		want    store.PortalAppID
 		wantErr bool
 	}{
 		{
 			name: "should extract from header if present",
-			request: &envoy_auth.AttributeContext_HttpRequest{
-				Path: "/v1/shouldNotBeUsed",
-				Headers: map[string]string{
-					reqHeaderPortalAppID: "headerID",
-				},
-			},
+			headers: convertMapToHeader(map[string]string{
+				reqHeaderPortalAppID: "headerID",
+			}),
+			path:    "/v1/shouldNotBeUsed",
 			want:    "headerID",
 			wantErr: false,
 		},
 		{
-			name: "should fall back to path if header missing",
-			request: &envoy_auth.AttributeContext_HttpRequest{
-				Path:    "/v1/pathID",
-				Headers: map[string]string{},
-			},
+			name:    "should fall back to path if header missing",
+			headers: http.Header{},
+			path:    "/v1/pathID",
 			want:    "pathID",
 			wantErr: false,
 		},
 		{
-			name: "should error if both header and path are missing",
-			request: &envoy_auth.AttributeContext_HttpRequest{
-				Path:    "/v1/",
-				Headers: map[string]string{},
-			},
+			name:    "should error if both header and path are missing",
+			headers: http.Header{},
+			path:    "/v1/",
 			want:    "",
 			wantErr: true,
 		},
 		{
-			name: "should error if neither valid header nor valid path",
-			request: &envoy_auth.AttributeContext_HttpRequest{
-				Path:    "/invalid/path",
-				Headers: map[string]string{},
-			},
+			name:    "should error if neither valid header nor valid path",
+			headers: http.Header{},
+			path:    "/invalid/path",
 			want:    "",
 			wantErr: true,
 		},
@@ -57,7 +49,7 @@ func Test_extractPortalAppID(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := extractPortalAppID(test.request)
+			got, err := extractPortalAppID(test.headers, test.path)
 			if (err != nil) != test.wantErr {
 				t.Errorf("extractPortalAppID() error = %v, wantErr %v", err, test.wantErr)
 				return
@@ -69,30 +61,28 @@ func Test_extractPortalAppID(t *testing.T) {
 	}
 }
 
-func Test_extractFromPath(t *testing.T) {
+func Test_extractFromHeader(t *testing.T) {
 	tests := []struct {
 		name    string
-		request *envoy_auth.AttributeContext_HttpRequest
+		headers http.Header
 		want    store.PortalAppID
 	}{
 		{
-			name: "should extract portal app ID from valid path",
-			request: &envoy_auth.AttributeContext_HttpRequest{
-				Path: "/v1/1a2b3c4d",
-			},
+			name: "should extract portal app ID from header",
+			headers: convertMapToHeader(map[string]string{
+				reqHeaderPortalAppID: "1a2b3c4d",
+			}),
 			want: "1a2b3c4d",
 		},
 		{
-			name: "should return empty for path without portal app ID",
-			request: &envoy_auth.AttributeContext_HttpRequest{
-				Path: "/v1/",
-			},
-			want: "",
+			name:    "should return empty when header is missing",
+			headers: http.Header{},
+			want:    "",
 		},
 		{
-			name: "should return empty for invalid path",
-			request: &envoy_auth.AttributeContext_HttpRequest{
-				Path: "/invalid/1a2b3c4d",
+			name: "should return empty when header is empty",
+			headers: http.Header{
+				reqHeaderPortalAppID: []string{""},
 			},
 			want: "",
 		},
@@ -100,52 +90,42 @@ func Test_extractFromPath(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := extractFromPath(test.request)
+			got := extractFromHeader(test.headers)
 			if got != test.want {
-				t.Errorf("extractFromPath() = %v, want %v", got, test.want)
+				t.Errorf("extractFromHeader() = %v, want %v", got, test.want)
 			}
 		})
 	}
 }
 
-func Test_extractFromHeader(t *testing.T) {
+func Test_extractFromPath(t *testing.T) {
 	tests := []struct {
-		name    string
-		request *envoy_auth.AttributeContext_HttpRequest
-		want    store.PortalAppID
+		name string
+		path string
+		want store.PortalAppID
 	}{
 		{
-			name: "should extract portal app ID from header",
-			request: &envoy_auth.AttributeContext_HttpRequest{
-				Headers: map[string]string{
-					reqHeaderPortalAppID: "1a2b3c4d",
-				},
-			},
+			name: "should extract portal app ID from valid path",
+			path: "/v1/1a2b3c4d",
 			want: "1a2b3c4d",
 		},
 		{
-			name: "should return empty when header is missing",
-			request: &envoy_auth.AttributeContext_HttpRequest{
-				Headers: map[string]string{},
-			},
+			name: "should return empty for path without portal app ID",
+			path: "/v1/",
 			want: "",
 		},
 		{
-			name: "should return empty when header is empty",
-			request: &envoy_auth.AttributeContext_HttpRequest{
-				Headers: map[string]string{
-					reqHeaderPortalAppID: "",
-				},
-			},
+			name: "should return empty for invalid path",
+			path: "/invalid/1a2b3c4d",
 			want: "",
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := extractFromHeader(test.request)
+			got := extractFromPath(test.path)
 			if got != test.want {
-				t.Errorf("extractFromHeader() = %v, want %v", got, test.want)
+				t.Errorf("extractFromPath() = %v, want %v", got, test.want)
 			}
 		})
 	}

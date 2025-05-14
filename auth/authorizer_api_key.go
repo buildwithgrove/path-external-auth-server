@@ -1,6 +1,10 @@
 package auth
 
-import store "github.com/buildwithgrove/path-external-auth-server/portal_app_store"
+import (
+	"net/http"
+
+	store "github.com/buildwithgrove/path-external-auth-server/portal_app_store"
+)
 
 const (
 	authHeaderKey = "Authorization"
@@ -12,9 +16,9 @@ const (
 type APIKeyAuthorizer struct{}
 
 // authorizeRequest authorizes a request using an API key.
-func (a *APIKeyAuthorizer) authorizeRequest(headers map[string]string, portalApp *store.PortalApp) error {
-	// Extract the API key from the Authorization header
-	headerValue := headers[authHeaderKey]
+func (a *APIKeyAuthorizer) authorizeRequest(headers http.Header, portalApp *store.PortalApp) error {
+	// Extract the API key from the Authorization header (case-insensitive lookup)
+	headerValue := headers.Get(authHeaderKey)
 	if headerValue == "" {
 		return errUnauthorized
 	}

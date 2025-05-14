@@ -7,6 +7,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	envoy_core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy_auth "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
@@ -75,12 +76,12 @@ func (a *AuthHandler) Check(
 		return getDeniedCheckResponse("path not provided", envoy_type.StatusCode_BadRequest), nil
 	}
 
-	// Get the request headers
-	headers := req.GetHeaders()
+	// Get the request headers as a http.Header
+	headers := convertMapToHeader(req.GetHeaders())
 
 	// Extract the portal app ID from the request
 	// It may be extracted from the URL path or the headers
-	portalAppID, err := extractPortalAppID(req)
+	portalAppID, err := extractPortalAppID(headers, path)
 	if err != nil {
 		a.Logger.Info().Err(err).Msg("unable to extract portal app ID from request")
 		return getDeniedCheckResponse(err.Error(), envoy_type.StatusCode_BadRequest), nil
@@ -112,13 +113,23 @@ func (a *AuthHandler) Check(
 
 /* --------------------------------- Helpers -------------------------------- */
 
+// convertMapToHeader converts a map[string]string to a http.Header
+// Used to ensure case-insensitive header access
+func convertMapToHeader(headersMap map[string]string) http.Header {
+	httpHeaders := make(http.Header, len(headersMap))
+	for key, value := range headersMap {
+		httpHeaders.Add(key, value)
+	}
+	return httpHeaders
+}
+
 // getPortalApp fetches the PortalApp from the portal app store and a bool indicating if it was found
 func (a *AuthHandler) getPortalApp(portalAppID store.PortalAppID) (*store.PortalApp, bool) {
 	return a.PortalAppStore.GetPortalApp(portalAppID)
 }
 
 // authPortalApp performs all configured authorization checks on the request
-func (a *AuthHandler) authPortalApp(headers map[string]string, portalApp *store.PortalApp) error {
+func (a *AuthHandler) authPortalApp(headers http.Header, portalApp *store.PortalApp) error {
 	// If the portal app has no authorization requirements, return no error
 	if portalApp.Auth == nil || portalApp.Auth.APIKey == "" {
 		return nil
