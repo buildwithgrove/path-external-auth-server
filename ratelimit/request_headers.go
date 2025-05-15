@@ -3,8 +3,9 @@ package ratelimit
 import (
 	"fmt"
 
-	store "github.com/buildwithgrove/path-external-auth-server/portal_app_store"
 	envoy_core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
+
+	store "github.com/buildwithgrove/path-external-auth-server/portal_app_store"
 )
 
 // Rate limit headers in this file must match the Relay Limit rules defined in the GUARD Helm Chart `values.yaml`
