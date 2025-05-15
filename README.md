@@ -22,10 +22,11 @@
 It is part of the GUARD authorization system for PATH and runs in the PATH Kubernetes cluster.
 
 It has the following two responsibilities:
-1. Authentication 
+
+1. Authenticating Requests
    - Determines if requests to GUARD are authorized
    - If the request is authorized, the request is forwarded upstream
-2. Rate Limiting 
+2. Assigning Rate Limiting Headers
    - Assigns rate limiting headers to requests to GUARD
    - These headers are forwarded to the upstream Envoy rate limit service
   
