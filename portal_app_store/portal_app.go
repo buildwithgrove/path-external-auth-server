@@ -9,7 +9,7 @@ type (
 // PortalApp represents a single portal app for a user's account.
 type PortalApp struct {
 	// Unique identifier for the PortalApp.
-	PortalAppID PortalAppID
+	ID PortalAppID
 	// Unique identifier for the PortalApp's account.
 	AccountID AccountID
 	// The authorization settings for the PortalApp.

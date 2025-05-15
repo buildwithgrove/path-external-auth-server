@@ -58,33 +58,35 @@ graph TD
 
 ### `PortalApp` Structure
 
-PEAS manages authentication and assigning rate limiting headers for portal apps that are defined with the following structure:
+`PEAS` manages authentication and assigning rate limiting headers for portal apps that are defined with the following structure:
 
 ```go
 // PortalApp represents a single portal app for a user's account.
 type PortalApp struct {
-    // Used to identify the PortalApp when making a service request.
-    PortalAppID PortalAppID
-    // Unique identifier for the user's account
-    AccountID AccountID
-    // The authorization settings for the PortalApp.
-    Auth *Auth
-    // Rate Limiting settings for the PortalApp.
-    RateLimit *RateLimit
+	// Unique identifier for the PortalApp.
+	ID PortalAppID
+	// Unique identifier for the PortalApp's account.
+	AccountID AccountID
+	// The authorization settings for the PortalApp.
+	// Auth can be one of:
+	//   - NoAuth: The portal app does not require authorization (Auth will be nil)
+	//   - APIKey: The portal app uses an API key for authorization
+	Auth *Auth
+	// Rate Limiting settings for the PortalApp.
+	// If the portal app is not rate limited, RateLimit will be nil.
+	RateLimit *RateLimit
 }
 
 // Auth represents the authorization settings for a PortalApp.
-// Auth can be one of:
-//   - NoAuth: The portal app does not require authorization (no fields are set)
-//   - APIKey: The portal app uses an API key for authorization
+// Only API key auth is supported by the Grove Portal.
 type Auth struct {
-    APIKey string
+	APIKey string
 }
 
 // RateLimit contains rate limiting settings for a PortalApp.
 type RateLimit struct {
-    PlanType         PlanType
-    MonthlyUserLimit int32
+	PlanType         PlanType
+	MonthlyUserLimit int32
 }
 ```
 
@@ -94,22 +96,22 @@ type RateLimit struct {
 
 PEAS adds the following headers to authorized requests before forwarding them to the upstream service:
 
-| Header                  | Contents                                                                                  | Included For All Requests                                            | Example Value |
-| ----------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------- |
-| `Portal-Application-ID` | The portal app ID of the authorized portal app                                            | ✅                                                                    | "a12b3c4d"    |
-| `Portal-Account-ID`     | The account ID associated with the portal app                                             | ✅                                                                    | "3f4g2js2"    |
-| `Rl-Plan-Free`          | The portal app ID for rate limiting purposes (PLAN_FREE)                                  | ❌ (Only for `PLAN_FREE` portal apps)                                 | "a12b3c4d"    |
-| `Rl-User-Limit-<X>`     | The portal app ID for rate limiting purposes with a user limit *(X = relays in millions)* | ❌ (Only for `PLAN_UNLIMITED` portal apps with user-specified limits) | "a12b3c4d"    |
+| Header                  | Contents                                                                               | Included For All Requests                                            | Example Value |
+| ----------------------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------- |
+| `Portal-Application-ID` | The portal app ID of the authorized portal app                                         | ✅                                                                    | "a12b3c4d"    |
+| `Portal-Account-ID`     | The account ID associated with the portal app                                          | ✅                                                                    | "3f4g2js2"    |
+| `Rl-Plan-Free`          | The account ID for rate limiting purposes (PLAN_FREE)                                  | ❌ (Only for `PLAN_FREE` portal apps)                                 | "3f4g2js2"    |
+| `Rl-User-Limit-<X>`     | The account ID for rate limiting purposes with a user limit *(X = relays in millions)* | ❌ (Only for `PLAN_UNLIMITED` portal apps with user-specified limits) | "3f4g2js2"    |
 
 ## Rate Limiting Implementation
 
 PEAS provides rate limiting capabilities through the following mechanisms:
 
-1. **Plan-Based Rate Limiting**: For `PLAN_FREE` portal apps, PEAS will add headers like `Rl-Plan-Free: <portal-app-id>`.
+1. **Plan-Based Rate Limiting**: For `PLAN_FREE` portal apps, PEAS will add headers like `Rl-Plan-Free: <account-id>`.
 
 2. **User-Based Rate Limiting**: For `PLAN_UNLIMITED` portal apps with user-specified monthly limits, PEAS adds headers based on the limit in millions:
-   - 10 million monthly user limit: `Rl-User-Limit-10: <portal-app-id>`
-   - 40 million monthly user limit: `Rl-User-Limit-40: <portal-app-id>`
+   - 10 million monthly user limit: `Rl-User-Limit-10: <account-id>`
+   - 40 million monthly user limit: `Rl-User-Limit-40: <account-id>`
    - etc..
 
 These headers are processed by the Envoy rate limiter configured in the GUARD system, allowing for granular control over request rates.

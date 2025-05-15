@@ -90,7 +90,7 @@ func Test_GetPortalApp(t *testing.T) {
 			c.Equal(test.expectedPortalAppFound, found)
 
 			if test.expectedPortalApp != nil {
-				c.Equal(test.expectedPortalApp.PortalAppID, portalApp.PortalAppID)
+				c.Equal(test.expectedPortalApp.ID, portalApp.ID)
 
 				// Compare Auth details if present
 				if test.expectedPortalApp.Auth != nil {
@@ -121,8 +121,8 @@ func Test_GetPortalApp(t *testing.T) {
 func getTestPortalApps() map[PortalAppID]*PortalApp {
 	return map[PortalAppID]*PortalApp{
 		"portal_app_1_static_key": {
-			PortalAppID: "portal_app_1_static_key",
-			AccountID:   "account_1",
+			ID:        "portal_app_1_static_key",
+			AccountID: "account_1",
 			Auth: &Auth{
 				APIKey: "api_key_1",
 			},
@@ -132,9 +132,9 @@ func getTestPortalApps() map[PortalAppID]*PortalApp {
 			},
 		},
 		"portal_app_2_no_auth": {
-			PortalAppID: "portal_app_2_no_auth",
-			AccountID:   "account_2",
-			Auth:        nil,
+			ID:        "portal_app_2_no_auth",
+			AccountID: "account_2",
+			Auth:      nil,
 			RateLimit: &RateLimit{
 				PlanType:         "PLAN_UNLIMITED",
 				MonthlyUserLimit: 0,
@@ -153,9 +153,9 @@ func getTestUpdate(portalAppID string) *PortalAppUpdate {
 		"portal_app_2_no_auth": {
 			PortalAppID: "portal_app_2_no_auth",
 			PortalApp: &PortalApp{
-				PortalAppID: "portal_app_2_no_auth",
-				AccountID:   "account_2",
-				Auth:        nil,
+				ID:        "portal_app_2_no_auth",
+				AccountID: "account_2",
+				Auth:      nil,
 				RateLimit: &RateLimit{
 					PlanType:         "PLAN_UNLIMITED",
 					MonthlyUserLimit: 0,
@@ -166,8 +166,8 @@ func getTestUpdate(portalAppID string) *PortalAppUpdate {
 		"portal_app_3_static_key": {
 			PortalAppID: "portal_app_3_static_key",
 			PortalApp: &PortalApp{
-				PortalAppID: "portal_app_3_static_key",
-				AccountID:   "account_3",
+				ID:        "portal_app_3_static_key",
+				AccountID: "account_3",
 				Auth: &Auth{
 					APIKey: "new_api_key",
 				},

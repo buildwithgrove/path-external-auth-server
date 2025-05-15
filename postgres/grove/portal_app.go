@@ -10,12 +10,12 @@ import (
 // in the existing Grove Portal Database. It is necessary to convert the existing `portal_applications`
 // table schema to the new `PortalApp` struct expected by the PATH Go External Authorization Server.
 type portalApplicationRow struct {
-	ID                string `json:"id"`                  // The PortalApp ID maps to the PortalApp.PortalAppId
-	SecretKey         string `json:"secret_key"`          // The PortalApp SecretKey maps to the PortalApp.Auth.AuthType.StaticApiKey.ApiKey
-	SecretKeyRequired bool   `json:"secret_key_required"` // The PortalApp SecretKeyRequired determines whether the auth type is StaticApiKey or NoAuth
-	AccountID         string `json:"account_id"`          // The PortalApp AccountID maps to the PortalApp.Metadata.AccountId
-	MonthlyUserLimit  int32  `json:"monthly_relay_limit"` // The PortalApp MonthlyUserLimit maps to the PortalApp.Metadata.MonthlyUserLimit
-	Plan              string `json:"plan"`                // The PortalApp Plan maps to the PortalApp.Metadata.PlanType
+	ID                string         `json:"id"`                  // The PortalApp ID maps to PortalApp.PortalAppII
+	AccountID         string         `json:"account_id"`          // The PortalApp AccountID maps to the PortalApp.Metadata.AccountId
+	SecretKey         string         `json:"secret_key"`          // The PortalApp SecretKey maps to the PortalApp.Auth.AuthType.StaticApiKey.ApiKey
+	SecretKeyRequired bool           `json:"secret_key_required"` // The PortalApp SecretKeyRequired determines whether the auth type is StaticApiKey or NoAuth
+	MonthlyUserLimit  int32          `json:"monthly_relay_limit"` // The PortalApp MonthlyUserLimit maps to the PortalApp.Metadata.MonthlyUserLimit
+	Plan              store.PlanType `json:"plan"`                // The PortalApp Plan maps to the PortalApp.Metadata.PlanType
 }
 
 // sqlcPortalAppsToPortalAppRow (not the plurality of Apps) converts a row from the
@@ -25,10 +25,10 @@ type portalApplicationRow struct {
 func sqlcPortalAppsToPortalAppRow(r sqlc.SelectPortalAppsRow) *portalApplicationRow {
 	return &portalApplicationRow{
 		ID:                r.ID,
+		AccountID:         r.AccountID.String,
 		SecretKey:         r.SecretKey.String,
 		SecretKeyRequired: r.SecretKeyRequired.Bool,
-		AccountID:         r.AccountID.String,
-		Plan:              r.Plan.String,
+		Plan:              store.PlanType(r.Plan.String),
 		MonthlyUserLimit:  r.MonthlyUserLimit.Int32,
 	}
 }
@@ -40,20 +40,20 @@ func sqlcPortalAppsToPortalAppRow(r sqlc.SelectPortalAppsRow) *portalApplication
 func sqlcPortalAppToPortalAppRow(r sqlc.SelectPortalAppRow) *portalApplicationRow {
 	return &portalApplicationRow{
 		ID:                r.ID,
+		AccountID:         r.AccountID.String,
 		SecretKey:         r.SecretKey.String,
 		SecretKeyRequired: r.SecretKeyRequired.Bool,
-		AccountID:         r.AccountID.String,
-		Plan:              r.Plan.String,
+		Plan:              store.PlanType(r.Plan.String),
 		MonthlyUserLimit:  r.MonthlyUserLimit.Int32,
 	}
 }
 
 func (r *portalApplicationRow) convertToPortalApp() *store.PortalApp {
 	return &store.PortalApp{
-		PortalAppID: store.PortalAppID(r.ID),
-		AccountID:   store.AccountID(r.AccountID),
-		Auth:        r.getAuthDetails(),
-		RateLimit:   r.getRateLimitDetails(),
+		ID:        store.PortalAppID(r.ID),
+		AccountID: store.AccountID(r.AccountID),
+		Auth:      r.getAuthDetails(),
+		RateLimit: r.getRateLimitDetails(),
 	}
 }
 

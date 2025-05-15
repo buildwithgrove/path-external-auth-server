@@ -103,7 +103,7 @@ func (a *AuthHandler) Check(
 		return getDeniedCheckResponse(err.Error(), envoy_type.StatusCode_Unauthorized), nil
 	}
 
-	// Add portal app ID and rate limiting values to the headers
+	// Add portal app ID, account ID, and rate limiting values to the headers
 	// to be passed upstream along the filter chain to the rate limiter.
 	httpHeaders := a.getHTTPHeaders(portalApp)
 
@@ -147,7 +147,7 @@ func (a *AuthHandler) getHTTPHeaders(portalApp *store.PortalApp) []*envoy_core.H
 		{
 			Header: &envoy_core.HeaderValue{
 				Key:   reqHeaderPortalAppID,
-				Value: string(portalApp.PortalAppID),
+				Value: string(portalApp.ID),
 			},
 		},
 		// Set account ID header on all requests

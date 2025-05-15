@@ -37,16 +37,16 @@ func Test_sqlcPortalAppsToProto(t *testing.T) {
 			},
 			expected: map[store.PortalAppID]*store.PortalApp{
 				"portal_app_1_static_key": {
-					PortalAppID: "portal_app_1_static_key",
-					AccountID:   "account_1",
+					ID:        "portal_app_1_static_key",
+					AccountID: "account_1",
 					Auth: &store.Auth{
 						APIKey: "secret_key_1",
 					},
 				},
 				"portal_app_2_no_auth": {
-					PortalAppID: "portal_app_2_no_auth",
-					AccountID:   "account_2",
-					Auth:        nil, // No auth required
+					ID:        "portal_app_2_no_auth",
+					AccountID: "account_2",
+					Auth:      nil, // No auth required
 					RateLimit: &store.RateLimit{
 						PlanType: "PLAN_FREE",
 					},

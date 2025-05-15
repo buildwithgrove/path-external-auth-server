@@ -47,16 +47,16 @@ func Test_Check(t *testing.T) {
 						Headers: []*envoy_core.HeaderValueOption{
 							{Header: &envoy_core.HeaderValue{Key: reqHeaderPortalAppID, Value: "portal_app_free"}},
 							{Header: &envoy_core.HeaderValue{Key: reqHeaderAccountID, Value: "account_1"}},
-							{Header: &envoy_core.HeaderValue{Key: ratelimit.PlanFreeHeader, Value: "portal_app_free"}},
+							{Header: &envoy_core.HeaderValue{Key: ratelimit.PlanFreeHeader, Value: "account_1"}},
 						},
 					},
 				},
 			},
 			portalAppID: "portal_app_free",
 			mockPortalAppReturn: &store.PortalApp{
-				PortalAppID: "portal_app_free",
-				AccountID:   "account_1",
-				Auth:        nil, // No auth required
+				ID:        "portal_app_free",
+				AccountID: "account_1",
+				Auth:      nil, // No auth required
 				RateLimit: &store.RateLimit{
 					PlanType: ratelimit.DBPlanFree,
 				},
@@ -92,8 +92,8 @@ func Test_Check(t *testing.T) {
 			},
 			portalAppID: "portal_app_unlimited",
 			mockPortalAppReturn: &store.PortalApp{
-				PortalAppID: "portal_app_unlimited",
-				AccountID:   "account_2",
+				ID:        "portal_app_unlimited",
+				AccountID: "account_2",
 				Auth: &store.Auth{
 					APIKey: "api_key_good",
 				},
@@ -130,8 +130,8 @@ func Test_Check(t *testing.T) {
 			},
 			portalAppID: "portal_app_api_key",
 			mockPortalAppReturn: &store.PortalApp{
-				PortalAppID: "portal_app_api_key",
-				AccountID:   "account_3",
+				ID:        "portal_app_api_key",
+				AccountID: "account_3",
 				Auth: &store.Auth{
 					APIKey: "api_key_good",
 				},
@@ -164,9 +164,9 @@ func Test_Check(t *testing.T) {
 			},
 			portalAppID: "portal_app_public",
 			mockPortalAppReturn: &store.PortalApp{
-				PortalAppID: "portal_app_public",
-				AccountID:   "account_4",
-				Auth:        nil, // No auth required
+				ID:        "portal_app_public",
+				AccountID: "account_4",
+				Auth:      nil, // No auth required
 			},
 		},
 		{
@@ -199,9 +199,9 @@ func Test_Check(t *testing.T) {
 			},
 			portalAppID: "portal_app_id_from_header",
 			mockPortalAppReturn: &store.PortalApp{
-				PortalAppID: "portal_app_id_from_header",
-				AccountID:   "account_5",
-				Auth:        nil, // No auth required
+				ID:        "portal_app_id_from_header",
+				AccountID: "account_5",
+				Auth:      nil, // No auth required
 			},
 		},
 		{
@@ -262,7 +262,7 @@ func Test_Check(t *testing.T) {
 			},
 			portalAppID: "portal_app_api_key",
 			mockPortalAppReturn: &store.PortalApp{
-				PortalAppID: "portal_app_api_key",
+				ID: "portal_app_api_key",
 				Auth: &store.Auth{
 					APIKey: "api_key_not_this_one",
 				},

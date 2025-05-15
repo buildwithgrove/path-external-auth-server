@@ -212,7 +212,7 @@ func (d *GrovePostgresDriver) handleUpsertChange(ctx context.Context, qtx *sqlc.
 
 		// Send the upsert update
 		d.updatesCh <- store.PortalAppUpdate{
-			PortalAppID: portalApp.PortalAppID,
+			PortalAppID: portalApp.ID,
 			PortalApp:   portalApp,
 		}
 	}

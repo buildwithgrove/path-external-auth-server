@@ -44,23 +44,23 @@ func Test_Integration_FetchAuthDataSync(t *testing.T) {
 			name: "should retrieve all portal appsdata correctly",
 			expected: map[store.PortalAppID]*store.PortalApp{
 				"portal_app_1_no_auth": {
-					PortalAppID: "portal_app_1_no_auth",
-					AccountID:   "account_1",
-					Auth:        nil, // No auth required
+					ID:        "portal_app_1_no_auth",
+					AccountID: "account_1",
+					Auth:      nil, // No auth required
 					RateLimit: &store.RateLimit{
 						PlanType: "PLAN_FREE",
 					},
 				},
 				"portal_app_2_static_key": {
-					PortalAppID: "portal_app_2_static_key",
-					AccountID:   "account_2",
+					ID:        "portal_app_2_static_key",
+					AccountID: "account_2",
 					Auth: &store.Auth{
 						APIKey: "secret_key_2",
 					},
 				},
 				"portal_app_3_static_key": {
-					PortalAppID: "portal_app_3_static_key",
-					AccountID:   "account_3",
+					ID:        "portal_app_3_static_key",
+					AccountID: "account_3",
 					Auth: &store.Auth{
 						APIKey: "secret_key_3",
 					},
@@ -69,24 +69,24 @@ func Test_Integration_FetchAuthDataSync(t *testing.T) {
 					},
 				},
 				"portal_app_4_no_auth": {
-					PortalAppID: "portal_app_4_no_auth",
-					AccountID:   "account_1",
-					Auth:        nil, // No auth required
+					ID:        "portal_app_4_no_auth",
+					AccountID: "account_1",
+					Auth:      nil, // No auth required
 					RateLimit: &store.RateLimit{
 						PlanType: "PLAN_FREE",
 					},
 				},
 				"portal_app_5_static_key": {
-					PortalAppID: "portal_app_5_static_key",
-					AccountID:   "account_2",
+					ID:        "portal_app_5_static_key",
+					AccountID: "account_2",
 					Auth: &store.Auth{
 						APIKey: "secret_key_5",
 					},
 				},
 				"portal_app_6_user_limit": {
-					PortalAppID: "portal_app_6_user_limit",
-					AccountID:   "account_4",
-					Auth:        nil, // No auth required
+					ID:        "portal_app_6_user_limit",
+					AccountID: "account_4",
+					Auth:      nil, // No auth required
 					RateLimit: &store.RateLimit{
 						PlanType:         "PLAN_UNLIMITED",
 						MonthlyUserLimit: 10_000_000,
