@@ -1,7 +1,8 @@
-// The auth package contains the implementation of the Envoy External Authorization gRPC service.
-// It is responsible for receiving requests from Envoy and authorizing them based on the PortalApp
-// data stored in the portalappstore package. It receives a check request from GUARD and determines if
-// the request should be authorized.
+// The auth package implements the Envoy External Authorization gRPC service.
+// Responsibilities:
+// - Receives requests from Envoy
+// - Authorizes requests based on PortalApp data stored in the portalappstore package
+// - Receives a check request from GUARD and determines if the request should be authorized
 package auth
 
 import (
@@ -22,11 +23,11 @@ import (
 
 const (
 	// TODO_TECHDEBT(@commoddity): This path segment should be configurable via a single source of truth.
-	// Not sure the best way to do this as it is referred to in multiple disparate places (eg. GUARD Helm charts, PATH's router.go & here)
+	// - Referred to in multiple places (e.g. GUARD Helm charts, PATH's router.go, and here)
 	pathPrefix = "/v1/"
 
-	// The portal app and account id need to match PATH's expected HTTP headers.
-	// See the following code section in PATH:
+	// The portal app and account id must match PATH's expected HTTP headers.
+	// Reference:
 	// https://github.com/buildwithgrove/path/blob/1e7b2d83294e8c406479ae5e480f4dca97414cee/gateway/observation.go#L16-L18
 	reqHeaderPortalAppID = "Portal-Application-ID" // Set on all service requests
 	reqHeaderAccountID   = "Portal-Account-ID"     // Set on all service requests
@@ -34,31 +35,35 @@ const (
 	errBody = `{"code": %d, "message": "%s"}`
 )
 
-// The PortalAppStore interface contains an in-memory store of PortalApps.
+// PortalAppStore interface provides an in-memory store of PortalApps.
 //
-// It is used to allow fast lookups of authorization data for PATH when processing requests.
+// Used for:
+// - Fast lookups of authorization data for PATH when processing requests.
 type PortalAppStore interface {
 	GetPortalApp(portalAppID store.PortalAppID) (*store.PortalApp, bool)
 }
 
-// AuthHandler processes requests from Envoy, primarily via the Check method called for each request.
+// AuthHandler processes requests from Envoy.
+//
+// Primary responsibilities:
+// - Handles requests via the Check method (called for each request)
 type AuthHandler struct {
 	Logger polylog.Logger
 
-	// The PortalAppStore contains an in-memory store of PortalApps
+	// PortalAppStore: in-memory store of PortalApps
 	PortalAppStore PortalAppStore
 
-	// Authorizers to be used for the request
+	// APIKeyAuthorizer: used for request authorization
 	APIKeyAuthorizer Authorizer
 }
 
-// Check satisfies the implementation of the Envoy External Authorization gRPC service.
-// It performs the following steps:
-// - Extracts the portal app ID from the path
-// - Extracts the account user ID from the headers
-// - Fetches the PortalApp from the database
-// - Performs all configured authorization checks
-// - Returns a response with the HTTP headers set
+// Check implements the Envoy External Authorization gRPC service.
+// Steps performed:
+// - Extract portal app ID from the path
+// - Extract account user ID from headers
+// - Fetch PortalApp from the database
+// - Perform all configured authorization checks
+// - Return a response with HTTP headers set
 func (a *AuthHandler) Check(
 	ctx context.Context,
 	checkReq *envoy_auth.CheckRequest,
@@ -112,8 +117,8 @@ func (a *AuthHandler) Check(
 
 // --------------------------------- Helpers ---------------------------------
 
-// convertMapToHeader converts a map[string]string to a http.Header
-// Used to ensure case-insensitive header access
+// convertMapToHeader converts a map[string]string to a http.Header.
+// - Ensures case-insensitive header access.
 func convertMapToHeader(headersMap map[string]string) http.Header {
 	httpHeaders := make(http.Header, len(headersMap))
 	for key, value := range headersMap {
@@ -122,35 +127,34 @@ func convertMapToHeader(headersMap map[string]string) http.Header {
 	return httpHeaders
 }
 
-// getPortalApp fetches the PortalApp from the portal app store and a bool indicating if it was found
+// getPortalApp fetches the PortalApp from the portal app store.
+// - Returns the PortalApp and a bool indicating if it was found.
 func (a *AuthHandler) getPortalApp(portalAppID store.PortalAppID) (*store.PortalApp, bool) {
 	return a.PortalAppStore.GetPortalApp(portalAppID)
 }
 
-// authPortalApp performs all configured authorization checks on the request
+// authPortalApp performs all configured authorization checks on the request.
+// - Returns nil if no authorization is required (Auth is nil or APIKey is empty)
+// - Otherwise, performs API Key authorization
 func (a *AuthHandler) authPortalApp(headers http.Header, portalApp *store.PortalApp) error {
-	// If the portal app has no authorization requirements, return no error
 	if portalApp.Auth == nil || portalApp.Auth.APIKey == "" {
 		return nil
 	}
-
-	// Otherwise, perform API Key authorization
 	return a.APIKeyAuthorizer.authorizeRequest(headers, portalApp)
 }
 
-// getHTTPHeaders sets all HTTP headers required by the PATH services on the request being forwarded
+// getHTTPHeaders sets all HTTP headers required by the PATH services on the request being forwarded.
+// - Adds portal app ID header on all requests ("Portal-Application-ID: <id>")
+// - Adds account ID header on all requests ("Portal-Account-ID: <id>")
+// - Adds rate limit header if applicable
 func (a *AuthHandler) getHTTPHeaders(portalApp *store.PortalApp) []*envoy_core.HeaderValueOption {
 	headers := []*envoy_core.HeaderValueOption{
-		// Set portal app ID header on all requests
-		// eg. "Portal-Application-ID: a12b3c4d"
 		{
 			Header: &envoy_core.HeaderValue{
 				Key:   reqHeaderPortalAppID,
 				Value: string(portalApp.ID),
 			},
 		},
-		// Set account ID header on all requests
-		// eg. "Portal-Account-ID: 3f4g2js2"
 		{
 			Header: &envoy_core.HeaderValue{
 				Key:   reqHeaderAccountID,
@@ -159,7 +163,6 @@ func (a *AuthHandler) getHTTPHeaders(portalApp *store.PortalApp) []*envoy_core.H
 		},
 	}
 
-	// Returns nil if the portal app is not rate limited.
 	if rateLimitHeader := ratelimit.GetRateLimitRequestHeader(portalApp); rateLimitHeader != nil {
 		headers = append(headers, rateLimitHeader)
 	}
@@ -168,6 +171,7 @@ func (a *AuthHandler) getHTTPHeaders(portalApp *store.PortalApp) []*envoy_core.H
 }
 
 // getDeniedCheckResponse returns a CheckResponse with denied status and error message.
+// - Sets PermissionDenied code and error message in response.
 func getDeniedCheckResponse(err string, httpCode envoy_type.StatusCode) *envoy_auth.CheckResponse {
 	return &envoy_auth.CheckResponse{
 		Status: &status.Status{
@@ -186,6 +190,7 @@ func getDeniedCheckResponse(err string, httpCode envoy_type.StatusCode) *envoy_a
 }
 
 // getOKCheckResponse returns a CheckResponse with OK status and provided headers.
+// - Sets OK code and attaches provided headers to response.
 func getOKCheckResponse(headers []*envoy_core.HeaderValueOption) *envoy_auth.CheckResponse {
 	return &envoy_auth.CheckResponse{
 		Status: &status.Status{

@@ -1,4 +1,4 @@
-# 🫛 PEAS
+# 🫛 PEAS <!-- omit in toc -->
 
 <div align="center">
 <h1>🫛 PEAS<br/>PATH External Auth Server</h1>
@@ -6,16 +6,14 @@
 </div>
 <br/>
 
-- [🫛 PEAS](#-peas)
-  - [Introduction](#introduction)
-    - [Docker Image](#docker-image)
-    - [Architecture Diagram](#architecture-diagram)
-    - [`PortalApp` Structure](#portalapp-structure)
-  - [Request Headers](#request-headers)
-  - [Rate Limiting Implementation](#rate-limiting-implementation)
-  - [Envoy Gateway Integration](#envoy-gateway-integration)
-  - [PEAS Environment Variables](#peas-environment-variables)
-
+- [Introduction](#introduction)
+  - [Docker Image](#docker-image)
+  - [Architecture Diagram](#architecture-diagram)
+  - [`PortalApp` Structure](#portalapp-structure)
+- [Request Headers](#request-headers)
+- [Rate Limiting Implementation](#rate-limiting-implementation)
+- [Envoy Gateway Integration](#envoy-gateway-integration)
+- [PEAS Environment Variables](#peas-environment-variables)
 
 ## Introduction
 
@@ -40,6 +38,7 @@ docker pull ghcr.io/buildwithgrove/path-external-auth-server:latest
 ```
 
 - [PEAS GHCR Package](https://github.com/orgs/buildwithgrove/packages/container/package/path-external-auth-server)
+
 ### Architecture Diagram
 
 ```mermaid
@@ -87,7 +86,7 @@ PEAS adds the following headers to authorized requests before forwarding them to
 | `Portal-Application-ID` | The portal app ID of the authorized portal app                                         | ✅                                                                    | "a12b3c4d"    |
 | `Portal-Account-ID`     | The account ID associated with the portal app                                          | ✅                                                                    | "3f4g2js2"    |
 | `Rl-Plan-Free`          | The account ID for rate limiting purposes (PLAN_FREE)                                  | ❌ (Only for `PLAN_FREE` portal apps)                                 | "3f4g2js2"    |
-| `Rl-User-Limit-<X>`     | The account ID for rate limiting purposes with a user limit *(X = relays in millions)* | ❌ (Only for `PLAN_UNLIMITED` portal apps with user-specified limits) | "3f4g2js2"    |
+| `Rl-User-Limit-<X>`     | The account ID for rate limiting purposes with a user limit _(X = relays in millions)_ | ❌ (Only for `PLAN_UNLIMITED` portal apps with user-specified limits) | "3f4g2js2"    |
 
 ## Rate Limiting Implementation
 
