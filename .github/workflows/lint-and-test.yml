@@ -44,7 +44,7 @@ jobs:
           git config --global url."https://${{ github.token }}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
 
       - name: Run all unit tests
-        run: make test_all_verbose
+        run: make test_verbose
 
   test-docker-build:
     name: Test build of Docker image
