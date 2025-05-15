@@ -1,7 +1,8 @@
+# 🫛 PEAS
+
 <div align="center">
 <h1>🫛 PEAS<br/>PATH External Auth Server</h1>
 <img src="https://storage.googleapis.com/grove-brand-assets/Presskit/Logo%20Joined-2.png" alt="Grove logo" width="500"/>
-
 </div>
 <br/>
 
@@ -23,7 +24,7 @@ PEAS receives a list of `GatewayEndpoints` that define which endpoints are autho
 
 - [`GatewayEndpoint` protobuf definition.](https://github.com/buildwithgrove/path-external-auth-server/blob/main/proto/gateway_endpoint.proto)
 
-`GatewayEndpoint` data is received from a `remote gRPC server` that may be implemented by a PATH gateway operator in any way they see fit. The only requirement is that it adhere to the to spec defined in the protobuf definition. 
+`GatewayEndpoint` data is received from a `remote gRPC server` that may be implemented by a PATH gateway operator in any way they see fit. The only requirement is that it adhere to the to spec defined in the protobuf definition.
 
 ## Request Headers
 
@@ -58,6 +59,7 @@ PEAS exposes a gRPC service that adheres to the spec expected by Envoy Proxy's `
 </div>
 
 For more information see:
+
 - [Envoy Gateway External Authorization Docs](https://gateway.envoyproxy.io/docs/tasks/security/ext-auth/)
 - [Envoy Proxy `ext_authz` HTTP Filter Docs](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter)
 

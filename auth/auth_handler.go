@@ -1,7 +1,8 @@
-// The auth package contains the implementation of the Envoy External Authorization gRPC service.
-// It is responsible for receiving requests from Envoy and authorizing them based on the GatewayEndpoint
-// data stored in the endpointstore package. It receives a check request from GUARD and determines if
-// the request should be authorized.
+// Package auth implements the Envoy External Authorization gRPC service.
+//
+// - Receives requests from Envoy
+// - Authorizes requests based on GatewayEndpoint data from the endpointstore package
+// - Handles check requests from GUARD to determine if a request should be authorized
 package auth
 
 import (
@@ -16,6 +17,7 @@ import (
 	"google.golang.org/grpc/codes"
 
 	"github.com/buildwithgrove/path-external-auth-server/proto"
+	"github.com/buildwithgrove/path-external-auth-server/ratelimit"
 )
 
 const (
@@ -23,63 +25,46 @@ const (
 	// Not sure the best way to do this as it is referred to in multiple disparate places (eg. GUARD Helm charts, PATH's router.go & here)
 	pathPrefix = "/v1/"
 
+	// TODO_TECHDEBT(@commoddity): Should we rename all instance of "endpoint id" to "application id"
+	// and all instance of "account id" to "user id" to align with PATH's terminology?
+
 	// The endpoint and account id need to match PATH's expected HTTP headers.
-	// See the following code section in PATH:
-	// https://github.com/buildwithgrove/path/blob/1e7b2d83294e8c406479ae5e480f4dca97414cee/gateway/observation.go#L16-L18
-	reqHeaderEndpointID = "Portal-Application-ID" // Set on all service requests
-	reqHeaderAccountID  = "Portal-Account-ID"     // Set on all service requests
+	// See the following code section in PATH: https://github.com/buildwithgrove/path/blob/1e7b2d83294e8c406479ae5e480f4dca97414cee/gateway/observation.go#L16-L18
+	// MUST be set on all service requests
+	reqHeaderEndpointID = "Portal-Application-ID"
+	// MUST be set on all service requests
+	reqHeaderAccountID = "Portal-Account-ID"
 
 	errBody = `{"code": %d, "message": "%s"}`
 )
 
-// Set only on endpoints with plan types that should be rate limited
-// The key is the plan type as specified in the database.
-// The value is the header key to be matched in the GUARD configuration.
+// EndpointStore provides an in-memory store of GatewayEndpoints and their associated data from PADS (PATH Auth Data Server).
 //
-// DEV_NOTE: New plans from the database should be added to this map.
-//
-// Documentation reference:
-// https://gateway.envoyproxy.io/docs/tasks/traffic/global-rate-limit/#rate-limit-distinct-users-except-admin
-const (
-	dbPlanFree     = "PLAN_FREE"    // The plan type as specified in the database
-	planFreeHeader = "Rl-Plan-Free" // The header key to be matched in the GUARD configuration
-)
-
-// Map used to convert the plan type as specified in the database to the
-// header key to be matched in the GUARD configuration.
-var rateLimitedPlanTypeHeaders = map[string]string{
-	dbPlanFree: planFreeHeader,
-}
-
-// The EndpointStore interface contains an in-memory store of GatewayEndpoints
-// and their associated data from the PADS (PATH Auth Data Server).
-// See: https://github.com/buildwithgrove/path-auth-data-server
-//
-// It used to allow fast lookups of authorization data for PATH when processing requests.
+// - See: https://github.com/buildwithgrove/path-auth-data-server
+// - Enables fast lookups of authorization data for PATH when processing requests.
 type EndpointStore interface {
 	GetGatewayEndpoint(endpointID string) (*proto.GatewayEndpoint, bool)
 }
 
-// The AuthHandler struct contains the methods for processing requests from Envoy,
-// primarily the Check method that is called by Envoy for each request.
+// AuthHandler processes requests from Envoy, primarily via the Check method called for each request.
 type AuthHandler struct {
 	Logger polylog.Logger
 
-	// The EndpointStore contains an in-memory store of GatewayEndpoints
-	// and their associated data from the PADS (PATH Auth Data Server).
+	// EndpointStore provides an in-memory store of GatewayEndpoints and their associated data from the PADS (PATH Auth Data Server).
 	EndpointStore EndpointStore
 
-	// The authorizers to be used for the request
+	// Authorizers to be used for the request
 	APIKeyAuthorizer Authorizer
 }
 
-// Check satisfies the implementation of the Envoy External Authorization gRPC service.
-// It performs the following steps:
-// - Extracts the endpoint ID from the path
-// - Extracts the account user ID from the headers
-// - Fetches the GatewayEndpoint from the database
-// - Performs all configured authorization checks
-// - Returns a response with the HTTP headers set
+// Check implements the Envoy External Authorization gRPC service.
+//
+// Steps:
+// - Extract endpoint ID from the path
+// - Extract account user ID from headers
+// - Fetch GatewayEndpoint from the database
+// - Perform all configured authorization checks
+// - Return a response with HTTP headers set
 func (a *AuthHandler) Check(
 	ctx context.Context,
 	checkReq *envoy_auth.CheckRequest,
@@ -131,21 +116,22 @@ func (a *AuthHandler) Check(
 	return getOKCheckResponse(httpHeaders), nil
 }
 
-/* --------------------------------- Helpers -------------------------------- */
+// --------------------------------- Helpers ---------------------------------
 
-// getGatewayEndpoint fetches the GatewayEndpoint from the endpoint store and a bool indicating if it was found
+// getGatewayEndpoint fetches the GatewayEndpoint from the endpoint store.
+// Returns the endpoint and a bool indicating if it was found.
 func (a *AuthHandler) getGatewayEndpoint(endpointID string) (*proto.GatewayEndpoint, bool) {
 	return a.EndpointStore.GetGatewayEndpoint(endpointID)
 }
 
-// authGatewayEndpoint performs all configured authorization checks on the request
+// authGatewayEndpoint performs all configured authorization checks on the request.
 func (a *AuthHandler) authGatewayEndpoint(headers map[string]string, gatewayEndpoint *proto.GatewayEndpoint) error {
-	// Get the authorization type for the gateway endpoint
+	// Get the authorization type for the gateway endpoint.
 	authType := gatewayEndpoint.GetAuth().GetAuthType()
 
 	switch authType.(type) {
 	case *proto.Auth_NoAuth:
-		return nil // If the endpoint has no authorization requirements, return no error
+		return nil // No authorization required for this endpoint.
 
 	case *proto.Auth_StaticApiKey:
 		return a.APIKeyAuthorizer.authorizeRequest(headers, gatewayEndpoint)
@@ -155,18 +141,15 @@ func (a *AuthHandler) authGatewayEndpoint(headers map[string]string, gatewayEndp
 	}
 }
 
-// getHTTPHeaders sets all HTTP headers required by the PATH services on the request being forwarded
+// getHTTPHeaders sets all HTTP headers required by PATH services on the forwarded request.
 func (a *AuthHandler) getHTTPHeaders(gatewayEndpoint *proto.GatewayEndpoint) []*envoy_core.HeaderValueOption {
-	endpointID := gatewayEndpoint.GetEndpointId()
-	metadata := gatewayEndpoint.GetMetadata()
-
 	headers := []*envoy_core.HeaderValueOption{
 		// Set endpoint ID header on all requests
 		// eg. "Portal-Application-ID: a12b3c4d"
 		{
 			Header: &envoy_core.HeaderValue{
 				Key:   reqHeaderEndpointID,
-				Value: endpointID,
+				Value: gatewayEndpoint.GetEndpointId(),
 			},
 		},
 		// Set account ID header on all requests
@@ -174,30 +157,20 @@ func (a *AuthHandler) getHTTPHeaders(gatewayEndpoint *proto.GatewayEndpoint) []*
 		{
 			Header: &envoy_core.HeaderValue{
 				Key:   reqHeaderAccountID,
-				Value: metadata.GetAccountId(),
+				Value: gatewayEndpoint.GetMetadata().GetAccountId(),
 			},
 		},
 	}
 
-	// Set rate limit headers if the endpoint should be rate limited
-	if planType := metadata.GetPlanType(); planType != "" {
-		// Only plans that are configured to be rate limited should have a rate limit header
-		if rateLimitHeader, ok := rateLimitedPlanTypeHeaders[planType]; ok {
-			// Set the rate header with the endpoint ID
-			// eg. "Rate-Limit-Plan-Free: a12b3c4d"
-			headers = append(headers, &envoy_core.HeaderValueOption{
-				Header: &envoy_core.HeaderValue{
-					Key:   rateLimitHeader,
-					Value: endpointID,
-				},
-			})
-		}
+	// Add rate limit header if endpoint should be rate limited.
+	if rateLimitHeader := ratelimit.GetRateLimitRequestHeader(gatewayEndpoint); rateLimitHeader != nil {
+		headers = append(headers, rateLimitHeader)
 	}
 
 	return headers
 }
 
-// getDeniedCheckResponse returns a CheckResponse with a denied status and error message
+// getDeniedCheckResponse returns a CheckResponse with denied status and error message.
 func getDeniedCheckResponse(err string, httpCode envoy_type.StatusCode) *envoy_auth.CheckResponse {
 	return &envoy_auth.CheckResponse{
 		Status: &status.Status{
@@ -215,7 +188,7 @@ func getDeniedCheckResponse(err string, httpCode envoy_type.StatusCode) *envoy_a
 	}
 }
 
-// getOKCheckResponse returns a CheckResponse with an OK status and the provided headers
+// getOKCheckResponse returns a CheckResponse with OK status and provided headers.
 func getOKCheckResponse(headers []*envoy_core.HeaderValueOption) *envoy_auth.CheckResponse {
 	return &envoy_auth.CheckResponse{
 		Status: &status.Status{
