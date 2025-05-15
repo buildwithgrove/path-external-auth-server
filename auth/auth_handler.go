@@ -160,7 +160,7 @@ func (a *AuthHandler) getHTTPHeaders(portalApp *store.PortalApp) []*envoy_core.H
 	}
 
 	// Returns nil if the portal app is not rate limited.
-	if rateLimitHeader := ratelimit.GetRateLimitHeader(portalApp); rateLimitHeader != nil {
+	if rateLimitHeader := ratelimit.GetRateLimitRequestHeader(portalApp); rateLimitHeader != nil {
 		headers = append(headers, rateLimitHeader)
 	}
 

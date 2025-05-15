@@ -3,9 +3,8 @@ package ratelimit
 import (
 	"fmt"
 
+	store "github.com/buildwithgrove/path-external-auth-server/portal_app_store"
 	envoy_core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
-
-	"github.com/buildwithgrove/path-external-auth-server/proto"
 )
 
 // Rate limit config in this file matches GUARD Helm Chart `values.yaml` (production)
@@ -25,7 +24,7 @@ const (
 // Map: DB plan type -> GUARD header key
 // Example:
 // - "PLAN_FREE" -> "Rl-Plan-Free"
-var rateLimitedPlanTypeHeaders = map[string]string{
+var rateLimitedPlanTypeHeaders = map[store.PlanType]string{
 	PlanFree_DatabaseType: PlanFree_RequestHeader,
 }
 
@@ -54,37 +53,33 @@ func getUserLimitRequestHeader(monthlyRelayLimit int32) string {
 //   - PLAN_FREE: "Rl-Plan-Free: <endpoint-id>"
 //   - 40M relay limit: "Rl-User-Limit-40: <endpoint-id>"
 //   - 10M relay limit: "Rl-User-Limit-10: <endpoint-id>"
-func GetRateLimitRequestHeader(gatewayEndpoint *proto.GatewayEndpoint) *envoy_core.HeaderValueOption {
-	metadata := gatewayEndpoint.GetMetadata()
-
-	// Get the plan type from the metadata
-	planType := metadata.GetPlanType()
-	if planType == "" {
+func GetRateLimitRequestHeader(portalApp *store.PortalApp) *envoy_core.HeaderValueOption {
+	// Return nil if the portal app is not rate limited.
+	if portalApp.RateLimit == nil {
 		return nil
 	}
 
-	// Get the endpoint ID from the gateway endpoint
-	endpointID := gatewayEndpoint.GetEndpointId()
+	rateLimit := portalApp.RateLimit
 
-	// Check if request is for a rate-limited plan (e.g., PLAN_FREE)
-	// Example: "Rl-Plan-Free: <endpoint-id>"
-	if rateLimitHeader, ok := rateLimitedPlanTypeHeaders[planType]; ok {
+	// First check if the portal app is rate limited by plan type.
+	// e.g. "Rl-Plan-Free: <portal-app-id>"
+	if rateLimitHeader, ok := rateLimitedPlanTypeHeaders[rateLimit.PlanType]; ok {
 		return &envoy_core.HeaderValueOption{
 			Header: &envoy_core.HeaderValue{
 				Key:   rateLimitHeader,
-				Value: endpointID,
+				Value: string(portalApp.PortalAppID),
 			},
 		}
 	}
 
-	// Otherwise, check if endpoint has user-specific monthly limit
-	// Example: "Rl-User-Limit-40: <endpoint-id>" (40M monthly limit)
-	if monthlyRelayLimit := metadata.GetMonthlyRelayLimit(); monthlyRelayLimit > 0 {
-		header := getUserLimitRequestHeader(monthlyRelayLimit)
+	// Then check if the portal app is rate limited by user-specified monthly limit.
+	// e.g. "Rl-User-Limit-40: <portal-app-id>" = 40 million monthly user limit
+	if rateLimit.MonthlyUserLimit > 0 {
+		rateLimitHeader := getUserLimitRequestHeader(rateLimit.MonthlyUserLimit)
 		return &envoy_core.HeaderValueOption{
 			Header: &envoy_core.HeaderValue{
-				Key:   header,
-				Value: endpointID,
+				Key:   rateLimitHeader,
+				Value: string(portalApp.PortalAppID),
 			},
 		}
 	}

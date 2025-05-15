@@ -71,7 +71,7 @@ func (r *portalApplicationRow) getRateLimitDetails() *store.RateLimit {
 	// The following scenarios are rate limited:
 	// 		- PLAN_FREE
 	// 		- PLAN_UNLIMITED with a user-specified monthly user limit
-	if r.Plan == ratelimit.DBPlanFree || r.MonthlyUserLimit > 0 {
+	if r.Plan == ratelimit.PlanFree_DatabaseType || r.MonthlyUserLimit > 0 {
 		return &store.RateLimit{
 			PlanType:         store.PlanType(r.Plan),
 			MonthlyUserLimit: r.MonthlyUserLimit,
