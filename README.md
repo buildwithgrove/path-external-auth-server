@@ -30,11 +30,11 @@ PEAS receives a list of `GatewayEndpoints` that define which endpoints are autho
 
 PEAS adds the following headers to authorized requests before forwarding them to the upstream service:
 
-| Header                  | Contents                                                        | Included For All Requests            | Example Value |
-| ----------------------- | --------------------------------------------------------------- | ------------------------------------ | ------------- |
-| `Portal-Application-ID` | The application ID (aka endpoint ID) of the authorized endpoint | ✅                                   | "a12b3c4d"    |
-| `Account-Id`            | The account ID associated with the endpoint                     | ✅                                   | "3f4g2js2"    |
-| `Rl-Plan-Free`          | The plan type for rate limiting purposes (PLAN_FREE)            | ❌ (Only for rate-limited endpoints) | "a12b3c4d"    |
+| Header                  | Contents                                               | Included For All Requests           | Example Value |
+| ----------------------- | ------------------------------------------------------ | ----------------------------------- | ------------- |
+| `Portal-Application-ID` | The portal application ID of the authorized portal app | ✅                                   | "a12b3c4d"    |
+| `Portal-Account-ID`     | The account ID associated with the portal application  | ✅                                   | "3f4g2js2"    |
+| `Rl-Plan-Free`          | The endpoint ID for rate limiting purposes (PLAN_FREE) | ❌ (Only for rate-limited endpoints) | "a12b3c4d"    |
 
 ## 🐾 PADS (PATH Auth Data Server)
 
@@ -69,6 +69,6 @@ PEAS is configured via environment variables.
 
 | Variable                      | Required | Type   | Description                                                                                                                          | Example          | Default Value |
 | ----------------------------- | -------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------ | ---------------- | ------------- |
-| GRPC_HOST_PORT                | ✅       | string | The host and port for the remote gRPC server connection that provides the GatewayEndpoint data. Must adhere to a `host:port` format. | guard-pads:10002 | -             |
-| GRPC_USE_INSECURE_CREDENTIALS | ❌       | bool   | Whether to use insecure credentials for the gRPC connection. Must be `true` if the remote gRPC server is not TLS-enabled.            | `true`           | `false`       |
-| PORT                          | ❌       | int    | The port to run the external auth server on.                                                                                         | 10001            | 10001         |
+| GRPC_HOST_PORT                | ✅        | string | The host and port for the remote gRPC server connection that provides the GatewayEndpoint data. Must adhere to a `host:port` format. | guard-pads:10002 | -             |
+| GRPC_USE_INSECURE_CREDENTIALS | ❌        | bool   | Whether to use insecure credentials for the gRPC connection. Must be `true` if the remote gRPC server is not TLS-enabled.            | `true`           | `false`       |
+| PORT                          | ❌        | int    | The port to run the external auth server on.                                                                                         | 10001            | 10001         |

@@ -144,14 +144,16 @@ func (a *AuthHandler) authGatewayEndpoint(headers map[string]string, gatewayEndp
 // getHTTPHeaders sets all HTTP headers required by PATH services on the forwarded request.
 func (a *AuthHandler) getHTTPHeaders(gatewayEndpoint *proto.GatewayEndpoint) []*envoy_core.HeaderValueOption {
 	headers := []*envoy_core.HeaderValueOption{
-		// Set endpoint ID header on all requests (e.g., "Portal-Application-ID: a12b3c4d")
+		// Set endpoint ID header on all requests
+		// eg. "Portal-Application-ID: a12b3c4d"
 		{
 			Header: &envoy_core.HeaderValue{
 				Key:   reqHeaderEndpointID,
 				Value: gatewayEndpoint.GetEndpointId(),
 			},
 		},
-		// Set account ID header on all requests (e.g., "Portal-Account-ID: 3f4g2js2")
+		// Set account ID header on all requests
+		// eg. "Portal-Account-ID: 3f4g2js2"
 		{
 			Header: &envoy_core.HeaderValue{
 				Key:   reqHeaderAccountID,
