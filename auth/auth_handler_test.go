@@ -47,7 +47,7 @@ func Test_Check(t *testing.T) {
 						Headers: []*envoy_core.HeaderValueOption{
 							{Header: &envoy_core.HeaderValue{Key: reqHeaderPortalAppID, Value: "portal_app_free"}},
 							{Header: &envoy_core.HeaderValue{Key: reqHeaderAccountID, Value: "account_1"}},
-							{Header: &envoy_core.HeaderValue{Key: string(ratelimit.PlanFree_DatabaseType), Value: "account_1"}},
+							{Header: &envoy_core.HeaderValue{Key: string(ratelimit.PlanFree_RequestHeader), Value: "account_1"}},
 						},
 					},
 				},
