@@ -41,15 +41,14 @@ type PortalAppStore interface {
 	GetPortalApp(portalAppID store.PortalAppID) (*store.PortalApp, bool)
 }
 
-// The AuthHandler struct contains the methods for processing requests from Envoy,
-// primarily the Check method that is called by Envoy for each request.
+// AuthHandler processes requests from Envoy, primarily via the Check method called for each request.
 type AuthHandler struct {
 	Logger polylog.Logger
 
 	// The PortalAppStore contains an in-memory store of PortalApps
 	PortalAppStore PortalAppStore
 
-	// The authorizers to be used for the request
+	// Authorizers to be used for the request
 	APIKeyAuthorizer Authorizer
 }
 
@@ -111,7 +110,7 @@ func (a *AuthHandler) Check(
 	return getOKCheckResponse(httpHeaders), nil
 }
 
-/* --------------------------------- Helpers -------------------------------- */
+// --------------------------------- Helpers ---------------------------------
 
 // convertMapToHeader converts a map[string]string to a http.Header
 // Used to ensure case-insensitive header access
@@ -161,14 +160,14 @@ func (a *AuthHandler) getHTTPHeaders(portalApp *store.PortalApp) []*envoy_core.H
 	}
 
 	// Returns nil if the portal app is not rate limited.
-	if rateLimitHeader := ratelimit.GetRateLimitHeader(portalApp); rateLimitHeader != nil {
+	if rateLimitHeader := ratelimit.GetRateLimitRequestHeader(portalApp); rateLimitHeader != nil {
 		headers = append(headers, rateLimitHeader)
 	}
 
 	return headers
 }
 
-// getDeniedCheckResponse returns a CheckResponse with a denied status and error message
+// getDeniedCheckResponse returns a CheckResponse with denied status and error message.
 func getDeniedCheckResponse(err string, httpCode envoy_type.StatusCode) *envoy_auth.CheckResponse {
 	return &envoy_auth.CheckResponse{
 		Status: &status.Status{
@@ -186,7 +185,7 @@ func getDeniedCheckResponse(err string, httpCode envoy_type.StatusCode) *envoy_a
 	}
 }
 
-// getOKCheckResponse returns a CheckResponse with an OK status and the provided headers
+// getOKCheckResponse returns a CheckResponse with OK status and provided headers.
 func getOKCheckResponse(headers []*envoy_core.HeaderValueOption) *envoy_auth.CheckResponse {
 	return &envoy_auth.CheckResponse{
 		Status: &status.Status{
