@@ -73,9 +73,7 @@ graph TD
 
 The `PortalApp` structure is defined in the `store` package and contains all data required from the Grove Portal Database for authorization and rate limiting.
 
-See structure [here](./store/portal_app.go).
-
-`PortalApp` data is sourced from a Postgres database compatible with the Grove Portal Database. For more information about the Grove Postgres integration, see the [Grove Postgres README](./postgres/grove/README.md).
+See `PortalApp` structure [here](https://github.com/buildwithgrove/path-external-auth-server/blob/main/store/portal_app.go).
 
 ## Request Headers
 
