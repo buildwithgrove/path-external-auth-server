@@ -7,10 +7,12 @@ import (
 	envoy_core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 )
 
-// Rate limit config in this file matches GUARD Helm Chart `values.yaml` (production)
+// Rate limit headers in this file must match the Relay Limit rules defined in the GUARD Helm Chart `values.yaml`
+// 	- https://github.com/buildwithgrove/helm-charts/blob/remove-pads-from-guard/charts/guard/values.yaml#L136
 //
-// Docs:
-// - https://gateway.envoyproxy.io/docs/tasks/traffic/global-rate-limit/#rate-limit-distinct-users-except-admin
+// Envoy Gateway Docs:
+// 	- Example configuration: https://gateway.envoyproxy.io/docs/tasks/traffic/global-rate-limit/#rate-limit-distinct-users-except-admin
+//  - Rate Limit Rules API Spec: https://gateway.envoyproxy.io/docs/api/extension_types/#ratelimitrule
 
 // Rate limiting plan constants:
 //   - Key: plan type from DB
@@ -20,9 +22,9 @@ import (
 const PlanFree_DatabaseType store.PlanType = "PLAN_FREE" // The plan type as specified in the database
 const PlanFree_RequestHeader = "Rl-Plan-Free"            // The header key to be matched in the GUARD configuration
 
-// Map: DB plan type -> GUARD header key
+// Map: DB plan type → GUARD header key
 // Example:
-//   - "PLAN_FREE" -> "Rl-Plan-Free"
+//   - "PLAN_FREE" → "Rl-Plan-Free"
 var rateLimitedPlanTypeHeaders = map[store.PlanType]string{
 	PlanFree_DatabaseType: PlanFree_RequestHeader,
 }
@@ -36,8 +38,9 @@ var rateLimitedPlanTypeHeaders = map[store.PlanType]string{
 const userLimitHeaderPrefix = "Rl-User-Limit-%d"
 
 // getUserLimitRequestHeader:
-// - Generates rate limit header from monthly relay limit
-// - `monthlyRelayLimit` must be a multiple of 1,000,000
+//   - Generates rate limit header from monthly relay limit
+//   - `monthlyRelayLimit` must be a multiple of 1,000,000
+//
 // Examples:
 //   - 40,000,000 → "Rl-User-Limit-40"
 //   - 10,000,000 → "Rl-User-Limit-10"
