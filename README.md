@@ -1,18 +1,20 @@
+# 🫛 PEAS
+
 <div align="center">
 <h1>🫛 PEAS<br/>PATH External Auth Server</h1>
 <img src="https://storage.googleapis.com/grove-brand-assets/Presskit/Logo%20Joined-2.png" alt="Grove logo" width="500"/>
-
 </div>
 <br/>
 
-- [Introduction](#introduction)
-  - [Docker Image](#docker-image)
-  - [Architecture Diagram](#architecture-diagram)
-  - [`PortalApp` Structure](#portalapp-structure)
-- [Request Headers](#request-headers)
-- [Rate Limiting Implementation](#rate-limiting-implementation)
-- [Envoy Gateway Integration](#envoy-gateway-integration)
-- [PEAS Environment Variables](#peas-environment-variables)
+- [🫛 PEAS](#-peas)
+  - [Introduction](#introduction)
+    - [Docker Image](#docker-image)
+    - [Architecture Diagram](#architecture-diagram)
+    - [`PortalApp` Structure](#portalapp-structure)
+  - [Request Headers](#request-headers)
+  - [Rate Limiting Implementation](#rate-limiting-implementation)
+  - [Envoy Gateway Integration](#envoy-gateway-integration)
+  - [PEAS Environment Variables](#peas-environment-variables)
 
 
 ## Introduction
@@ -125,6 +127,7 @@ PEAS exposes a gRPC service that adheres to the spec expected by Envoy Proxy's `
 </div>
 
 For more information see:
+
 - [Envoy Gateway External Authorization Docs](https://gateway.envoyproxy.io/docs/tasks/security/ext-auth/)
 - [Envoy Proxy `ext_authz` HTTP Filter Docs](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter)
 
