@@ -1,4 +1,4 @@
-# 🫛 PEAS
+# 🫛 PEAS <!-- omit in toc -->
 
 <div align="center">
 <h1>🫛 PEAS<br/>PATH External Auth Server</h1>
@@ -6,16 +6,14 @@
 </div>
 <br/>
 
-- [🫛 PEAS](#-peas)
-  - [Introduction](#introduction)
-    - [Docker Image](#docker-image)
-    - [Architecture Diagram](#architecture-diagram)
-    - [`PortalApp` Structure](#portalapp-structure)
-  - [Request Headers](#request-headers)
-  - [Rate Limiting Implementation](#rate-limiting-implementation)
-  - [Envoy Gateway Integration](#envoy-gateway-integration)
-  - [PEAS Environment Variables](#peas-environment-variables)
-
+- [Introduction](#introduction)
+  - [Docker Image](#docker-image)
+  - [Architecture Diagram](#architecture-diagram)
+  - [`PortalApp` Structure](#portalapp-structure)
+- [Request Headers](#request-headers)
+- [Rate Limiting Implementation](#rate-limiting-implementation)
+- [Envoy Gateway Integration](#envoy-gateway-integration)
+- [PEAS Environment Variables](#peas-environment-variables)
 
 ## Introduction
 
@@ -28,6 +26,7 @@ docker pull ghcr.io/buildwithgrove/path-external-auth-server:latest
 ```
 
 - [PEAS GHCR Package](https://github.com/orgs/buildwithgrove/packages/container/package/path-external-auth-server)
+
 ### Architecture Diagram
 
 ```mermaid
@@ -65,30 +64,30 @@ graph TD
 ```go
 // PortalApp represents a single portal app for a user's account.
 type PortalApp struct {
-	// Unique identifier for the PortalApp.
-	ID PortalAppID
-	// Unique identifier for the PortalApp's account.
-	AccountID AccountID
-	// The authorization settings for the PortalApp.
-	// Auth can be one of:
-	//   - NoAuth: The portal app does not require authorization (Auth will be nil)
-	//   - APIKey: The portal app uses an API key for authorization
-	Auth *Auth
-	// Rate Limiting settings for the PortalApp.
-	// If the portal app is not rate limited, RateLimit will be nil.
-	RateLimit *RateLimit
+// Unique identifier for the PortalApp.
+  ID PortalAppID
+// Unique identifier for the PortalApp's account.
+  AccountID AccountID
+// The authorization settings for the PortalApp.
+// Auth can be one of:
+//   - NoAuth: The portal app does not require authorization (Auth will be nil)
+//   - APIKey: The portal app uses an API key for authorization
+  Auth *Auth
+// Rate Limiting settings for the PortalApp.
+// If the portal app is not rate limited, RateLimit will be nil.
+  RateLimit *RateLimit
 }
 
 // Auth represents the authorization settings for a PortalApp.
 // Only API key auth is supported by the Grove Portal.
 type Auth struct {
-	APIKey string
+  APIKey string
 }
 
 // RateLimit contains rate limiting settings for a PortalApp.
 type RateLimit struct {
-	PlanType         PlanType
-	MonthlyUserLimit int32
+  PlanType         PlanType
+  MonthlyUserLimit int32
 }
 ```
 
@@ -98,12 +97,12 @@ type RateLimit struct {
 
 PEAS adds the following headers to authorized requests before forwarding them to the upstream service:
 
-| Header                  | Contents                                                                               | Included For All Requests                                            | Example Value |
-| ----------------------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------- |
+| Header                  | Contents                                                                               | Included For All Requests                                             | Example Value |
+| ----------------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | ------------- |
 | `Portal-Application-ID` | The portal app ID of the authorized portal app                                         | ✅                                                                    | "a12b3c4d"    |
 | `Portal-Account-ID`     | The account ID associated with the portal app                                          | ✅                                                                    | "3f4g2js2"    |
 | `Rl-Plan-Free`          | The account ID for rate limiting purposes (PLAN_FREE)                                  | ❌ (Only for `PLAN_FREE` portal apps)                                 | "3f4g2js2"    |
-| `Rl-User-Limit-<X>`     | The account ID for rate limiting purposes with a user limit *(X = relays in millions)* | ❌ (Only for `PLAN_UNLIMITED` portal apps with user-specified limits) | "3f4g2js2"    |
+| `Rl-User-Limit-<X>`     | The account ID for rate limiting purposes with a user limit _(X = relays in millions)_ | ❌ (Only for `PLAN_UNLIMITED` portal apps with user-specified limits) | "3f4g2js2"    |
 
 ## Rate Limiting Implementation
 
@@ -139,6 +138,6 @@ PEAS is configured via environment variables.
 
 | Variable                   | Required | Type   | Description                                                           | Example                                              | Default Value |
 | -------------------------- | -------- | ------ | --------------------------------------------------------------------- | ---------------------------------------------------- | ------------- |
-| POSTGRES_CONNECTION_STRING | ✅        | string | The PostgreSQL connection string for the database with PortalApp data | postgresql://username:password@localhost:5432/dbname | -             |
-| PORT                       | ❌        | int    | The port to run the external auth server on                           | 10001                                                | 10001         |
-| LOGGER_LEVEL               | ❌        | string | The log level to use for the external auth server                     | info                                                 | info          |
+| POSTGRES_CONNECTION_STRING | ✅       | string | The PostgreSQL connection string for the database with PortalApp data | postgresql://username:password@localhost:5432/dbname | -             |
+| PORT                       | ❌       | int    | The port to run the external auth server on                           | 10001                                                | 10001         |
+| LOGGER_LEVEL               | ❌       | string | The log level to use for the external auth server                     | info                                                 | info          |
