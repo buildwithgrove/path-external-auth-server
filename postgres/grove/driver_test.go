@@ -8,7 +8,7 @@ import (
 	"github.com/pokt-network/poktroll/pkg/polylog/polyzero"
 	"github.com/stretchr/testify/require"
 
-	store "github.com/buildwithgrove/path-external-auth-server/portal_app_store"
+	"github.com/buildwithgrove/path-external-auth-server/store"
 )
 
 var connectionString string

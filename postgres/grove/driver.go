@@ -10,8 +10,8 @@ import (
 	"github.com/jackc/pgxlisten"
 	"github.com/pokt-network/poktroll/pkg/polylog"
 
-	store "github.com/buildwithgrove/path-external-auth-server/portal_app_store"
 	"github.com/buildwithgrove/path-external-auth-server/postgres/grove/sqlc"
+	"github.com/buildwithgrove/path-external-auth-server/store"
 )
 
 // GrovePostgresDriver implements the store.DataSource interface

@@ -3,7 +3,7 @@
 //
 // It fetches this data from the database through an initial store update
 // on startup, then listens for updates from the database to update the store.
-package portalappstore
+package store
 
 // dataSource defines the interface for a data source that provides portal apps.
 //

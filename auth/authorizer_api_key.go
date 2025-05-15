@@ -3,7 +3,7 @@ package auth
 import (
 	"net/http"
 
-	store "github.com/buildwithgrove/path-external-auth-server/portal_app_store"
+	"github.com/buildwithgrove/path-external-auth-server/store"
 )
 
 const (

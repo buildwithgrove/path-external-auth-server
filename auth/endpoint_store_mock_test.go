@@ -12,7 +12,7 @@ package auth
 import (
 	reflect "reflect"
 
-	store "github.com/buildwithgrove/path-external-auth-server/portal_app_store"
+	"github.com/buildwithgrove/path-external-auth-server/store"
 	gomock "go.uber.org/mock/gomock"
 )
 

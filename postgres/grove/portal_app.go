@@ -1,9 +1,9 @@
 package grove
 
 import (
-	store "github.com/buildwithgrove/path-external-auth-server/portal_app_store"
 	"github.com/buildwithgrove/path-external-auth-server/postgres/grove/sqlc"
 	"github.com/buildwithgrove/path-external-auth-server/ratelimit"
+	"github.com/buildwithgrove/path-external-auth-server/store"
 )
 
 // portalApplicationRow is a struct that represents a row from the portal_applications table

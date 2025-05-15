@@ -10,8 +10,8 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/buildwithgrove/path-external-auth-server/auth"
-	store "github.com/buildwithgrove/path-external-auth-server/portal_app_store"
 	"github.com/buildwithgrove/path-external-auth-server/postgres/grove"
+	"github.com/buildwithgrove/path-external-auth-server/store"
 )
 
 func main() {

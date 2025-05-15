@@ -6,8 +6,8 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/require"
 
-	store "github.com/buildwithgrove/path-external-auth-server/portal_app_store"
 	"github.com/buildwithgrove/path-external-auth-server/postgres/grove/sqlc"
+	"github.com/buildwithgrove/path-external-auth-server/store"
 )
 
 func Test_sqlcPortalAppsToProto(t *testing.T) {

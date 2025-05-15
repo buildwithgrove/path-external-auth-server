@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	store "github.com/buildwithgrove/path-external-auth-server/portal_app_store"
 	"github.com/buildwithgrove/path-external-auth-server/postgres/grove/sqlc"
+	"github.com/buildwithgrove/path-external-auth-server/store"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"

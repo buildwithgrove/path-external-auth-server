@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	store "github.com/buildwithgrove/path-external-auth-server/portal_app_store"
+	"github.com/buildwithgrove/path-external-auth-server/store"
 )
 
 func Test_extractPortalAppID(t *testing.T) {

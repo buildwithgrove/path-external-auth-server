@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	store "github.com/buildwithgrove/path-external-auth-server/portal_app_store"
+	"github.com/buildwithgrove/path-external-auth-server/store"
 )
 
 // errUnauthorized is returned when a request is not authorized.

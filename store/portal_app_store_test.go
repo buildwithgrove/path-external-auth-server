@@ -1,4 +1,4 @@
-package portalappstore
+package store
 
 import (
 	"testing"

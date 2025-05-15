@@ -19,7 +19,19 @@
 
 ## Introduction
 
-**PEAS** (PATH External Auth Server) is an external authorization server that can be used to authorize requests to the [PATH Gateway](https://github.com/buildwithgrove/path). It is part of the GUARD authorization system for PATH and runs in the PATH Kubernetes cluster.
+**PEAS** (PATH External Auth Server) is an external authorization server that can be used to authorize requests to the [PATH Gateway](https://github.com/buildwithgrove/path). 
+
+It is part of the GUARD authorization system for PATH and runs in the PATH Kubernetes cluster.
+
+It has the following two responsibilities:
+1. Authentication 
+   - Determines if requests to GUARD are authorized
+   - If the request is authorized, the request is forwarded upstream
+2. Rate Limiting 
+   - Assigns rate limiting headers to requests to GUARD
+   - These headers are forwarded to the upstream Envoy rate limit service
+  
+Data for authentication and rate limiting is sourced from the Grove Portal Database. For more information about the Grove Portal Database, see the [Grove Portal Database README](./postgres/grove/README.md).
 
 ### Docker Image
 
@@ -60,37 +72,9 @@ graph TD
 
 ### `PortalApp` Structure
 
-`PEAS` manages authentication and assigning rate limiting headers for portal apps that are defined with the following structure:
+The `PortalApp` structure is defined in the `store` package and contains all data required from the Grove Portal Database for authorization and rate limiting.
 
-```go
-// PortalApp represents a single portal app for a user's account.
-type PortalApp struct {
-	// Unique identifier for the PortalApp.
-	ID PortalAppID
-	// Unique identifier for the PortalApp's account.
-	AccountID AccountID
-	// The authorization settings for the PortalApp.
-	// Auth can be one of:
-	//   - NoAuth: The portal app does not require authorization (Auth will be nil)
-	//   - APIKey: The portal app uses an API key for authorization
-	Auth *Auth
-	// Rate Limiting settings for the PortalApp.
-	// If the portal app is not rate limited, RateLimit will be nil.
-	RateLimit *RateLimit
-}
-
-// Auth represents the authorization settings for a PortalApp.
-// Only API key auth is supported by the Grove Portal.
-type Auth struct {
-	APIKey string
-}
-
-// RateLimit contains rate limiting settings for a PortalApp.
-type RateLimit struct {
-	PlanType         PlanType
-	MonthlyUserLimit int32
-}
-```
+See structure [here](./store/portal_app.go).
 
 `PortalApp` data is sourced from a Postgres database compatible with the Grove Portal Database. For more information about the Grove Postgres integration, see the [Grove Postgres README](./postgres/grove/README.md).
 

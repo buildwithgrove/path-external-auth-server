@@ -7,7 +7,7 @@
 //
 
 // Package portalappstore is a generated GoMock package.
-package portalappstore
+package store
 
 import (
 	reflect "reflect"

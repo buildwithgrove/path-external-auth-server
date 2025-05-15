@@ -14,8 +14,8 @@ import (
 	"google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
 
-	store "github.com/buildwithgrove/path-external-auth-server/portal_app_store"
 	"github.com/buildwithgrove/path-external-auth-server/ratelimit"
+	"github.com/buildwithgrove/path-external-auth-server/store"
 )
 
 func Test_Check(t *testing.T) {

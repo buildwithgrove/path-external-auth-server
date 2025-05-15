@@ -1,4 +1,4 @@
-package portalappstore
+package store
 
 type (
 	PortalAppID string

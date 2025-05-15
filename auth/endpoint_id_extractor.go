@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	store "github.com/buildwithgrove/path-external-auth-server/portal_app_store"
+	"github.com/buildwithgrove/path-external-auth-server/store"
 )
 
 // extractPortalAppID extracts the portal app ID from the HTTP request.
