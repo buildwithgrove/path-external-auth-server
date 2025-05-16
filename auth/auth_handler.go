@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	envoy_core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy_auth "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
@@ -68,6 +69,14 @@ func (a *AuthHandler) Check(
 	ctx context.Context,
 	checkReq *envoy_auth.CheckRequest,
 ) (*envoy_auth.CheckResponse, error) {
+	start := time.Now()
+	var portalAppID store.PortalAppID
+	defer func() {
+		if portalAppID != "" {
+			logAuthDuration(a.Logger, string(portalAppID), start)
+		}
+	}()
+
 	// Get the HTTP request
 	req := checkReq.GetAttributes().GetRequest().GetHttp()
 	if req == nil {
@@ -113,6 +122,17 @@ func (a *AuthHandler) Check(
 
 	// Return a valid response with the HTTP headers set
 	return getOKCheckResponse(httpHeaders), nil
+}
+
+// logAuthDuration logs the duration of the auth request in ms at debug level, and warns if over 100ms.
+func logAuthDuration(logger polylog.Logger, portalAppID string, start time.Time) {
+	elapsed := time.Since(start)
+	elapsedMs := float64(elapsed.Microseconds()) / 1000.0
+	logger = logger.With("portal_app_id", portalAppID)
+	logger.Debug().Float64("auth_request_duration_ms", elapsedMs).Msg("auth request processed")
+	if elapsed > 100*time.Millisecond {
+		logger.Warn().Float64("auth_request_duration_ms", elapsedMs).Msg("auth request took over 100ms")
+	}
 }
 
 // --------------------------------- Helpers ---------------------------------
