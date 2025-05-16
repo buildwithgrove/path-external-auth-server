@@ -5,55 +5,59 @@ import (
 	"net/http"
 	"strings"
 
-	envoy_auth "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
+	"github.com/buildwithgrove/path-external-auth-server/store"
 )
 
-// extractEndpointID extracts the endpoint ID from the HTTP request.
-// It first attempts to extract the ID from the header.
-// If the above fails, it falls back to the URL path.
-// If both extraction methods fail, it returns an error.
-func extractEndpointID(req *envoy_auth.AttributeContext_HttpRequest) (string, error) {
-	if id := extractFromHeader(req); id != "" {
+// extractPortalAppID extracts the portal app ID from an HTTP request.
+//
+// Extraction order:
+// - Try to extract from the header first
+// - If not found, try to extract from the URL path
+// - If neither method succeeds, return an error
+func extractPortalAppID(headers http.Header, path string) (store.PortalAppID, error) {
+	if id := extractPortalAppIDFromHeader(headers); id != "" {
 		return id, nil
 	}
-	if id := extractFromPath(req); id != "" {
+	if id := extractPortalAppIDFromPath(path); id != "" {
 		return id, nil
 	}
-	return "", fmt.Errorf("endpoint ID not provided in header or path")
+	return "", fmt.Errorf("portal app ID not provided in header or path")
 }
 
-// extractFromHeader extracts the endpoint ID from the headers.
-// It returns the endpoint ID if found and non-empty, otherwise an empty string.
-// Example: Header = "Portal-Application-ID: 1a2b3c4d" -> endpointID = "1a2b3c4d"
-func extractFromHeader(req *envoy_auth.AttributeContext_HttpRequest) string {
-	headers := req.GetHeaders()
-
-	// Convert map[string]string to http.Header as `GetHeaders` returns
-	// map[string]string which could lead to case-sensitivity issues.
-	httpHeaders := make(http.Header)
-	for key, value := range headers {
-		httpHeaders.Add(key, value)
-	}
-
+// extractPortalAppIDFromHeader gets the portal app ID from HTTP headers.
+//
+// - Returns the portal app ID if present and non-empty
+// - Returns an empty string if not found
+//
+// Example:
+//
+//	Header: "Portal-Application-ID: 1a2b3c4d"
+//	Returns: "1a2b3c4d"
+func extractPortalAppIDFromHeader(headers http.Header) store.PortalAppID {
 	// Use http.Header's Get method which is case-insensitive
-	endpointID := httpHeaders.Get(reqHeaderEndpointID)
-	if endpointID == "" {
+	portalAppID := headers.Get(reqHeaderPortalAppID)
+	if portalAppID == "" {
 		return ""
 	}
 
-	return endpointID
+	return store.PortalAppID(portalAppID)
 }
 
-// extractFromPath extracts the endpoint ID from the URL path.
-// It expects the path to have the prefix "/v1/" and the endpoint ID as the first segment after it.
-// It returns the endpoint ID if found, otherwise an empty string.
-// Example: http://eth.path.grove.city/v1/1a2b3c4d -> endpointID = "1a2b3c4d"
-func extractFromPath(req *envoy_auth.AttributeContext_HttpRequest) string {
-	path := req.GetPath()
+// extractPortalAppIDFromPath gets the portal app ID from the URL path.
+//
+// - Expects path to start with "/v1/"
+// - Returns the first segment after the prefix as the portal app ID
+// - Returns an empty string if not found
+//
+// Example:
+//
+//	Path: "/v1/1a2b3c4d"
+//	Returns: "1a2b3c4d"
+func extractPortalAppIDFromPath(path string) store.PortalAppID {
 	if strings.HasPrefix(path, pathPrefix) {
 		segments := strings.Split(strings.TrimPrefix(path, pathPrefix), "/")
 		if len(segments) > 0 && segments[0] != "" {
-			return segments[0]
+			return store.PortalAppID(segments[0])
 		}
 	}
 	return ""

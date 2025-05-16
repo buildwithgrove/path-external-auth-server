@@ -15,25 +15,30 @@ help: ## Prints all the targets in all the Makefiles
 ### Test Targets ###
 ####################
 
-.PHONY: test_all
-test_all: ## Runs all tests
+.PHONY: test
+test: ## Runs all tests
 	go test ./... -count=1
 
-.PHONY: test_all_verbose
-test_all_verbose: ## Runs all tests with verbose output enabled
+.PHONY: test_verbose
+test_verbose: ## Runs all tests with verbose output enabled
 	go test -v ./... -count=1
 
 .PHONY: test_unit
 test_unit: ## Runs unit tests only (excludes Postgres Docker integration tests)
 	go test ./... -short -count=1
 
-#######################
-### Proto  Helpers ####
-#######################
+###############################
+### Mock Generation Targets ###
+###############################
 
-.PHONY: proto_gen_envoy
-proto_gen_envoy: ## Generate envoy protobuf artifacts
-	protoc \
-		--go_out=./proto \
-		--go-grpc_out=./proto \
-		proto/gateway_endpoint.proto
+.PHONY: gen_mocks
+gen_mocks: ## Generates the mocks for the project
+	mockgen -source=./portal_app_store/data_source.go -destination=./portal_app_store/data_source_mock_test.go -package=portalappstore
+
+#############################
+### SQL Generator Targets ###
+#############################
+
+.PHONY: grove_gen_sqlc
+grove_gen_sqlc: ## Generates the SQLC code for Grove's portal schema
+	sqlc generate -f ./postgres/grove/sqlc/sqlc.yaml

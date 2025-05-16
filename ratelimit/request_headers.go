@@ -5,40 +5,43 @@ import (
 
 	envoy_core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 
-	"github.com/buildwithgrove/path-external-auth-server/proto"
+	"github.com/buildwithgrove/path-external-auth-server/store"
 )
 
-// Rate limit config in this file matches GUARD Helm Chart `values.yaml` (production)
+// Rate limit headers in this file must match the Relay Limit rules defined in the GUARD Helm Chart `values.yaml`
+// 	- https://github.com/buildwithgrove/helm-charts/blob/remove-pads-from-guard/charts/guard/values.yaml#L136
 //
-// Docs:
-// - https://gateway.envoyproxy.io/docs/tasks/traffic/global-rate-limit/#rate-limit-distinct-users-except-admin
+// Envoy Gateway Docs:
+// 	- Example configuration: https://gateway.envoyproxy.io/docs/tasks/traffic/global-rate-limit/#rate-limit-distinct-users-except-admin
+//  - Rate Limit Rules API Spec: https://gateway.envoyproxy.io/docs/api/extension_types/#ratelimitrule
 
 // Rate limiting plan constants:
-// - Key: plan type from DB
-// - Value: header key matched in GUARD config
-const (
-	// KV Pair for the free plan
-	PlanFree_DatabaseType  = "PLAN_FREE"    // Free plan key (i.e. database value)
-	PlanFree_RequestHeader = "Rl-Plan-Free" // Free plan value (i.e. request header key)
-)
+//   - Key: plan type from DB
+//   - Value: header key matched in GUARD config
+//
+// KV Pair for the free plan
+const PlanFree_DatabaseType store.PlanType = "PLAN_FREE" // The plan type as specified in the database
+const PlanFree_RequestHeader = "Rl-Plan-Free"            // The header key to be matched in the GUARD configuration
 
-// Map: DB plan type -> GUARD header key
+// Map: DB plan type → GUARD header key
 // Example:
-// - "PLAN_FREE" -> "Rl-Plan-Free"
-var rateLimitedPlanTypeHeaders = map[string]string{
+//   - "PLAN_FREE" → "Rl-Plan-Free"
+var rateLimitedPlanTypeHeaders = map[store.PlanType]string{
 	PlanFree_DatabaseType: PlanFree_RequestHeader,
 }
 
-// Prefix for user-specific rate limit headers
-// - Integer = monthly relay limit (in millions)
+// Prefix for user-specified rate limit headers
+//   - Integer = monthly relay limit (in millions)
+//
 // Examples:
 //   - 40,000,000 → "Rl-User-Limit-40"
 //   - 10,000,000 → "Rl-User-Limit-10"
 const userLimitHeaderPrefix = "Rl-User-Limit-%d"
 
 // getUserLimitRequestHeader:
-// - Generates rate limit header from monthly relay limit
-// - `monthlyRelayLimit` must be a multiple of 1,000,000
+//   - Generates rate limit header from monthly relay limit
+//   - `monthlyRelayLimit` must be a multiple of 1,000,000
+//
 // Examples:
 //   - 40,000,000 → "Rl-User-Limit-40"
 //   - 10,000,000 → "Rl-User-Limit-10"
@@ -49,42 +52,41 @@ func getUserLimitRequestHeader(monthlyRelayLimit int32) string {
 }
 
 // GetRateLimitRequestHeader:
-// - Returns rate limit header for endpoint ID + metadata
+//   - Returns rate limit header for account ID
+//   - If the account is not rate limited, returns nil
+//
 // Examples:
-//   - PLAN_FREE: "Rl-Plan-Free: <endpoint-id>"
-//   - 40M relay limit: "Rl-User-Limit-40: <endpoint-id>"
-//   - 10M relay limit: "Rl-User-Limit-10: <endpoint-id>"
-func GetRateLimitRequestHeader(gatewayEndpoint *proto.GatewayEndpoint) *envoy_core.HeaderValueOption {
-	metadata := gatewayEndpoint.GetMetadata()
-
-	// Get the plan type from the metadata
-	planType := metadata.GetPlanType()
-	if planType == "" {
+//   - PLAN_FREE: "Rl-Plan-Free: <account-id>"
+//   - 40M relay limit: "Rl-User-Limit-40: <account-id>"
+//   - 10M relay limit: "Rl-User-Limit-10: <account-id>"
+func GetRateLimitRequestHeader(portalApp *store.PortalApp) *envoy_core.HeaderValueOption {
+	// Return nil if the account is not rate limited.
+	if portalApp.RateLimit == nil {
 		return nil
 	}
 
-	// Get the endpoint ID from the gateway endpoint
-	endpointID := gatewayEndpoint.GetEndpointId()
+	rateLimit := portalApp.RateLimit
 
-	// Check if request is for a rate-limited plan (e.g., PLAN_FREE)
-	// Example: "Rl-Plan-Free: <endpoint-id>"
-	if rateLimitHeader, ok := rateLimitedPlanTypeHeaders[planType]; ok {
+	// First check if the account is rate limited by plan type.
+	// e.g. "Rl-Plan-Free: <account-id>"
+	if rateLimitHeader, ok := rateLimitedPlanTypeHeaders[rateLimit.PlanType]; ok {
 		return &envoy_core.HeaderValueOption{
 			Header: &envoy_core.HeaderValue{
 				Key:   rateLimitHeader,
-				Value: endpointID,
+				Value: string(portalApp.AccountID),
 			},
 		}
 	}
 
-	// Otherwise, check if endpoint has user-specific monthly limit
-	// Example: "Rl-User-Limit-40: <endpoint-id>" (40M monthly limit)
-	if monthlyRelayLimit := metadata.GetMonthlyRelayLimit(); monthlyRelayLimit > 0 {
-		header := getUserLimitRequestHeader(monthlyRelayLimit)
+	// Then check if the account is rate limited by user-specified monthly limit.
+	// e.g. "Rl-User-Limit-40: <account-id>" = 40 million monthly user limit
+	if rateLimit.MonthlyUserLimit > 0 {
+		rateLimitHeader := getUserLimitRequestHeader(rateLimit.MonthlyUserLimit)
+
 		return &envoy_core.HeaderValueOption{
 			Header: &envoy_core.HeaderValue{
-				Key:   header,
-				Value: endpointID,
+				Key:   rateLimitHeader,
+				Value: string(portalApp.AccountID),
 			},
 		}
 	}

@@ -1,26 +1,51 @@
 package auth
 
 import (
-	"github.com/buildwithgrove/path-external-auth-server/proto"
+	"net/http"
+
+	"github.com/buildwithgrove/path-external-auth-server/store"
 )
 
-const reqHeaderAPIKey = "authorization" // Standard header for API keys
+const (
+	// authHeaderKey MUST be present
+	authHeaderKey = "Authorization"
 
-// APIKeyAuthorizer is an Authorizer that ensures the request is authorized
-// by checking if the API key matches the GatewayEndpoint's API key.
-type APIKeyAuthorizer struct{}
+	// apiKeyPrefix MAY be present
+	apiKeyPrefix = "Bearer "
+)
 
-// Enforce that the APIKeyAuthorizer implements the Authorizer interface.
-var _ Authorizer = &APIKeyAuthorizer{}
+var _ Authorizer = (*AuthorizerAPIKey)(nil)
 
-// authorizeRequest checks if the API key is valid for the endpoint
-func (a *APIKeyAuthorizer) authorizeRequest(headers map[string]string, endpoint *proto.GatewayEndpoint) error {
-	apiKey, ok := headers[reqHeaderAPIKey]
-	if !ok || apiKey == "" {
+// AuthorizerAPIKey
+//
+// - Authorizes a request using an API key
+// - Compares the API key in the request headers with the API key in the PortalApp
+type AuthorizerAPIKey struct{}
+
+// authorizeRequest
+//
+// - Authorizes a request using an API key
+// - Returns errUnauthorized if the API key is missing or does not match
+func (a *AuthorizerAPIKey) authorizeRequest(
+	headers http.Header,
+	portalApp *store.PortalApp,
+) error {
+	// Extract the API key from the Authorization header (case-insensitive lookup)
+	headerValue := headers.Get(authHeaderKey)
+	if headerValue == "" {
 		return errUnauthorized
 	}
-	if endpoint.GetAuth().GetStaticApiKey().GetApiKey() != apiKey {
+
+	// Remove the "Bearer " prefix from the API key if present
+	apiKey := headerValue
+	if len(headerValue) > len(apiKeyPrefix) && headerValue[:len(apiKeyPrefix)] == apiKeyPrefix {
+		apiKey = headerValue[len(apiKeyPrefix):]
+	}
+
+	// Compare the API key with the expected value
+	if apiKey != portalApp.Auth.APIKey {
 		return errUnauthorized
 	}
+
 	return nil
 }
