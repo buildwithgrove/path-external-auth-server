@@ -28,7 +28,8 @@ type AuthorizerAPIKey struct{}
 // - Returns errUnauthorized if the API key is missing or does not match
 func (a *AuthorizerAPIKey) authorizeRequest(
 	headers http.Header,
-	portalApp *store.PortalApp) error {
+	portalApp *store.PortalApp,
+) error {
 	// Extract the API key from the Authorization header (case-insensitive lookup)
 	headerValue := headers.Get(authHeaderKey)
 	if headerValue == "" {
