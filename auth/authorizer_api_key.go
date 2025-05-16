@@ -7,16 +7,28 @@ import (
 )
 
 const (
+	// authHeaderKey MUST be present
 	authHeaderKey = "Authorization"
-	apiKeyPrefix  = "Bearer "
+
+	// apiKeyPrefix MAY be present
+	apiKeyPrefix = "Bearer "
 )
 
-// APIKeyAuthorizer authorizes a request using an API key.
-// It compares the API key in the request headers with the API key in the PortalApp.
-type APIKeyAuthorizer struct{}
+var _ Authorizer = (*AuthorizerAPIKey)(nil)
 
-// authorizeRequest authorizes a request using an API key.
-func (a *APIKeyAuthorizer) authorizeRequest(headers http.Header, portalApp *store.PortalApp) error {
+// AuthorizerAPIKey
+//
+// - Authorizes a request using an API key
+// - Compares the API key in the request headers with the API key in the PortalApp
+type AuthorizerAPIKey struct{}
+
+// authorizeRequest
+//
+// - Authorizes a request using an API key
+// - Returns errUnauthorized if the API key is missing or does not match
+func (a *AuthorizerAPIKey) authorizeRequest(
+	headers http.Header,
+	portalApp *store.PortalApp) error {
 	// Extract the API key from the Authorization header (case-insensitive lookup)
 	headerValue := headers.Get(authHeaderKey)
 	if headerValue == "" {

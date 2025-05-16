@@ -30,19 +30,19 @@ func main() {
 	logger := polyzero.NewLogger(loggerOpts...)
 
 	// Create a new postgres data source
-	dataSource, err := grove.NewGrovePostgresDriver(
+	postgresDataSource, err := grove.NewGrovePostgresDriver(
 		logger,
 		env.postgresConnectionString,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to connect to postgres: %v", err))
 	}
-	defer dataSource.Close()
+	defer postgresDataSource.Close()
 
-	logger.Info().Msg("Successfully connected to postgres")
+	logger.Info().Msg("Successfully connected to postgres as a data source")
 
 	// Create a new portal app store
-	portalAppStore, err := store.NewPortalAppStore(logger, dataSource)
+	portalAppStore, err := store.NewPortalAppStore(logger, postgresDataSource)
 	if err != nil {
 		panic(err)
 	}
@@ -59,7 +59,7 @@ func main() {
 	authHandler := &auth.AuthHandler{
 		Logger:           logger,
 		PortalAppStore:   portalAppStore,
-		APIKeyAuthorizer: &auth.APIKeyAuthorizer{},
+		APIKeyAuthorizer: &auth.AuthorizerAPIKey{},
 	}
 
 	// Create a new gRPC server for handling auth requests from GUARD

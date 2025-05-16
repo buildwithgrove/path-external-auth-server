@@ -1,11 +1,6 @@
-// The portalappstore package contains the implementation of an in-memory store that stores
-// PortalApps and their associated data from the Postgres database.
-//
-// It fetches this data from the database through an initial store update
-// on startup, then listens for updates from the database to update the store.
 package store
 
-// dataSource defines the interface for a data source that provides portal apps.
+// DataSource defines the interface for a data source that provides portal apps.
 //
 // Satisfied by grove.GrovePostgresDriver
 type DataSource interface {

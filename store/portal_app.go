@@ -10,13 +10,16 @@ type (
 type PortalApp struct {
 	// Unique identifier for the PortalApp.
 	ID PortalAppID
+
 	// Unique identifier for the PortalApp's account.
 	AccountID AccountID
+
 	// The authorization settings for the PortalApp.
 	// Auth can be one of:
 	//   - NoAuth: The portal app does not require authorization (Auth will be nil)
 	//   - APIKey: The portal app uses an API key for authorization
 	Auth *Auth
+
 	// Rate Limiting settings for the PortalApp.
 	// If the portal app is not rate limited, RateLimit will be nil.
 	RateLimit *RateLimit
@@ -38,8 +41,10 @@ type RateLimit struct {
 type PortalAppUpdate struct {
 	// The ID of the portal app being updated
 	PortalAppID PortalAppID
+
 	// The new portal app data, nil if this is a deletion
 	PortalApp *PortalApp
+
 	// Whether this update is deleting the portal app
 	Delete bool
 }

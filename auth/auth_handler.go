@@ -1,7 +1,7 @@
 // The auth package implements the Envoy External Authorization gRPC service.
 // Responsibilities:
 // - Receives requests from Envoy
-// - Authorizes requests based on PortalApp data stored in the portalappstore package
+// - Authorizes requests based on PortalApp data stored in the store package
 // - Receives a check request from GUARD and determines if the request should be authorized
 package auth
 

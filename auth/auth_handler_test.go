@@ -286,7 +286,7 @@ func Test_Check(t *testing.T) {
 				Logger: polyzero.NewLogger(),
 
 				PortalAppStore:   mockStore,
-				APIKeyAuthorizer: &APIKeyAuthorizer{},
+				APIKeyAuthorizer: &AuthorizerAPIKey{},
 			}
 
 			resp, err := authHandler.Check(context.Background(), test.checkReq)

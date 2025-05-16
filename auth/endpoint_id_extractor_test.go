@@ -90,7 +90,7 @@ func Test_extractFromHeader(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := extractFromHeader(test.headers)
+			got := extractPortalAppIDFromHeader(test.headers)
 			if got != test.want {
 				t.Errorf("extractFromHeader() = %v, want %v", got, test.want)
 			}
@@ -123,7 +123,7 @@ func Test_extractFromPath(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := extractFromPath(test.path)
+			got := extractPortalAppIDFromPath(test.path)
 			if got != test.want {
 				t.Errorf("extractFromPath() = %v, want %v", got, test.want)
 			}

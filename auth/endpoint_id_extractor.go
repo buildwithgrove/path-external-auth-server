@@ -8,24 +8,32 @@ import (
 	"github.com/buildwithgrove/path-external-auth-server/store"
 )
 
-// extractPortalAppID extracts the portal app ID from the HTTP request.
-// It first attempts to extract the ID from the header.
-// If the above fails, it falls back to the URL path.
-// If both extraction methods fail, it returns an error.
+// extractPortalAppID extracts the portal app ID from an HTTP request.
+//
+// Extraction order:
+// - Try to extract from the header first
+// - If not found, try to extract from the URL path
+// - If neither method succeeds, return an error
 func extractPortalAppID(headers http.Header, path string) (store.PortalAppID, error) {
-	if id := extractFromHeader(headers); id != "" {
+	if id := extractPortalAppIDFromHeader(headers); id != "" {
 		return id, nil
 	}
-	if id := extractFromPath(path); id != "" {
+	if id := extractPortalAppIDFromPath(path); id != "" {
 		return id, nil
 	}
 	return "", fmt.Errorf("portal app ID not provided in header or path")
 }
 
-// extractFromHeader extracts the portal app ID from the headers.
-// It returns the portal app ID if found and non-empty, otherwise an empty string.
-// Example: Header = "Portal-Application-ID: 1a2b3c4d" -> portalAppID = "1a2b3c4d"
-func extractFromHeader(headers http.Header) store.PortalAppID {
+// extractPortalAppIDFromHeader gets the portal app ID from HTTP headers.
+//
+// - Returns the portal app ID if present and non-empty
+// - Returns an empty string if not found
+//
+// Example:
+//
+//	Header: "Portal-Application-ID: 1a2b3c4d"
+//	Returns: "1a2b3c4d"
+func extractPortalAppIDFromHeader(headers http.Header) store.PortalAppID {
 	// Use http.Header's Get method which is case-insensitive
 	portalAppID := headers.Get(reqHeaderPortalAppID)
 	if portalAppID == "" {
@@ -35,11 +43,17 @@ func extractFromHeader(headers http.Header) store.PortalAppID {
 	return store.PortalAppID(portalAppID)
 }
 
-// extractFromPath extracts the portal app ID from the URL path.
-// It expects the path to have the prefix "/v1/" and the portal app ID as the first segment after it.
-// It returns the portal app ID if found, otherwise an empty string.
-// Example: http://eth.path.grove.city/v1/1a2b3c4d -> portalAppID = "1a2b3c4d"
-func extractFromPath(path string) store.PortalAppID {
+// extractPortalAppIDFromPath gets the portal app ID from the URL path.
+//
+// - Expects path to start with "/v1/"
+// - Returns the first segment after the prefix as the portal app ID
+// - Returns an empty string if not found
+//
+// Example:
+//
+//	Path: "/v1/1a2b3c4d"
+//	Returns: "1a2b3c4d"
+func extractPortalAppIDFromPath(path string) store.PortalAppID {
 	if strings.HasPrefix(path, pathPrefix) {
 		segments := strings.Split(strings.TrimPrefix(path, pathPrefix), "/")
 		if len(segments) > 0 && segments[0] != "" {
