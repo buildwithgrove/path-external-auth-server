@@ -163,7 +163,7 @@ func (d *GrovePostgresDriver) cleanupProcessedChanges(ctx context.Context, qtx *
 
 // fetchAndProcessChanges retrieves unprocessed changes from the database and processes them,
 // sending appropriate updates to the updatesCh channel.
-// Returns the IDs of processed changes and any error encountered.
+// Returns the IDs of successfully processed changes and any error encountered.
 func (d *GrovePostgresDriver) fetchAndProcessChanges(ctx context.Context, qtx *sqlc.Queries) ([]int32, error) {
 	// Get unprocessed changes
 	changes, err := qtx.GetPortalAppChanges(ctx)
@@ -175,22 +175,27 @@ func (d *GrovePostgresDriver) fetchAndProcessChanges(ctx context.Context, qtx *s
 		return nil, nil // No changes to process
 	}
 
-	var changeIDs []int32
+	var successfulChangeIDs []int32
 
 	// Process each change
 	for _, change := range changes {
-		// Process the change and collect its ID
-		changeIDs = append(changeIDs, change.ID)
+		var success bool
 
 		// Handle the change based on its type
 		if change.IsDelete {
 			d.handleDeleteChange(change)
+			success = true // Delete operations always succeed
 		} else {
-			d.handleUpsertChange(ctx, qtx, change)
+			success = d.handleUpsertChange(ctx, qtx, change)
+		}
+
+		// Only collect IDs of successfully processed changes
+		if success {
+			successfulChangeIDs = append(successfulChangeIDs, change.ID)
 		}
 	}
 
-	return changeIDs, nil
+	return successfulChangeIDs, nil
 }
 
 // handleDeleteChange processes a delete change by sending a delete update to the channel.
@@ -203,19 +208,48 @@ func (d *GrovePostgresDriver) handleDeleteChange(change sqlc.GetPortalAppChanges
 }
 
 // handleUpsertChange processes an upsert change by fetching the portal app details
-// and sending an update to the channel.
-func (d *GrovePostgresDriver) handleUpsertChange(ctx context.Context, qtx *sqlc.Queries, change sqlc.GetPortalAppChangesRow) {
-	// Get the portal app details
-	portalAppRow, err := qtx.SelectPortalApp(ctx, change.PortalAppID)
-	if err == nil {
-		portalApp := sqlcPortalAppToPortalAppRow(portalAppRow).convertToPortalApp()
+// and sending an update to the channel. Returns true if successful, false otherwise.
+func (d *GrovePostgresDriver) handleUpsertChange(ctx context.Context, qtx *sqlc.Queries, change sqlc.GetPortalAppChangesRow) bool {
+	const maxRetries = 3
+	var lastErr error
 
-		// Send the upsert update
-		d.updatesCh <- store.PortalAppUpdate{
-			PortalAppID: portalApp.ID,
-			PortalApp:   portalApp,
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		// Get the portal app details
+		portalAppRow, err := qtx.SelectPortalApp(ctx, change.PortalAppID)
+		if err == nil {
+			portalApp := sqlcPortalAppToPortalAppRow(portalAppRow).convertToPortalApp()
+
+			// Send the upsert update
+			d.updatesCh <- store.PortalAppUpdate{
+				PortalAppID: portalApp.ID,
+				PortalApp:   portalApp,
+			}
+			return true
+		}
+
+		lastErr = err
+		d.logger.Warn().
+			Err(err).
+			Str("portal_app_id", change.PortalAppID).
+			Int("attempt", attempt).
+			Int("max_retries", maxRetries).
+			Msg("failed to fetch portal app for cache update, retrying")
+
+		// Wait before retry (exponential backoff: 100ms, 200ms, 400ms)
+		if attempt < maxRetries {
+			backoffDuration := time.Duration(100*attempt*attempt) * time.Millisecond
+			time.Sleep(backoffDuration)
 		}
 	}
+
+	// All retries failed
+	d.logger.Error().
+		Err(lastErr).
+		Str("portal_app_id", change.PortalAppID).
+		Int("max_retries", maxRetries).
+		Msg("failed to fetch portal app for cache update after all retries - cache may be stale")
+
+	return false
 }
 
 // markChangesAsProcessed marks the specified changes as processed in the database.
