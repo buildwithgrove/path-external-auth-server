@@ -26,7 +26,6 @@ const (
 	dbName             = "postgres"
 	connStringFormat   = "postgres://%s:%s@%s/%s?sslmode=disable"
 	schemaLocation     = "./sqlc/grove_schema.sql"
-	triggersLocation   = "./sqlc/grove_triggers.sql"
 	seedTestDBLocation = "./testdata/seed-test-db.sql"
 	dockerEntrypoint   = ":/docker-entrypoint-initdb.d/init_%s.sql"
 	timeOut            = 1200
@@ -37,8 +36,7 @@ var (
 	containerEnvPassword = fmt.Sprintf("POSTGRES_PASSWORD=%s", password)
 	containerEnvDB       = fmt.Sprintf("POSTGRES_DB=%s", dbName)
 	schemaDockerPath     = filepath.Join(os.Getenv("PWD"), schemaLocation) + fmt.Sprintf(dockerEntrypoint, "1")
-	triggersDockerPath   = filepath.Join(os.Getenv("PWD"), triggersLocation) + fmt.Sprintf(dockerEntrypoint, "2")
-	seedTestDBDockerPath = filepath.Join(os.Getenv("PWD"), seedTestDBLocation) + fmt.Sprintf(dockerEntrypoint, "3")
+	seedTestDBDockerPath = filepath.Join(os.Getenv("PWD"), seedTestDBLocation) + fmt.Sprintf(dockerEntrypoint, "2")
 )
 
 func setupPostgresDocker() (*dockertest.Pool, *dockertest.Resource, string) {
@@ -47,7 +45,7 @@ func setupPostgresDocker() (*dockertest.Pool, *dockertest.Resource, string) {
 		Repository: containerRepo,
 		Tag:        containerTag,
 		Env:        []string{containerEnvUser, containerEnvPassword, containerEnvDB},
-		Mounts:     []string{schemaDockerPath, triggersDockerPath, seedTestDBDockerPath},
+		Mounts:     []string{schemaDockerPath, seedTestDBDockerPath},
 	}
 
 	pool, err := dockertest.NewPool("")

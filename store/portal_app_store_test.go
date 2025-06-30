@@ -15,7 +15,6 @@ func Test_GetPortalApp(t *testing.T) {
 		portalAppID            PortalAppID
 		expectedPortalApp      *PortalApp
 		expectedPortalAppFound bool
-		update                 *PortalAppUpdate
 	}{
 		{
 			name:                   "should return portal app when found",
@@ -28,27 +27,6 @@ func Test_GetPortalApp(t *testing.T) {
 			portalAppID:            "portal_app_2_no_auth",
 			expectedPortalApp:      getTestPortalApps()["portal_app_2_no_auth"],
 			expectedPortalAppFound: true,
-		},
-		{
-			name:                   "should return brand new portal app when update is received for new portal",
-			portalAppID:            "portal_app_3_static_key",
-			update:                 getTestUpdate("portal_app_3_static_key"),
-			expectedPortalApp:      getTestUpdate("portal_app_3_static_key").PortalApp,
-			expectedPortalAppFound: true,
-		},
-		{
-			name:                   "should return updated existing portal app when update is received for existing portal",
-			portalAppID:            "portal_app_2_no_auth",
-			update:                 getTestUpdate("portal_app_2_no_auth"),
-			expectedPortalApp:      getTestUpdate("portal_app_2_no_auth").PortalApp,
-			expectedPortalAppFound: true,
-		},
-		{
-			name:                   "should not return portal app when update is received to delete portal",
-			portalAppID:            "portal_app_1_static_key",
-			update:                 getTestUpdate("portal_app_1_static_key"),
-			expectedPortalApp:      nil,
-			expectedPortalAppFound: false,
 		},
 		{
 			name:                   "should return false when portal app not found",
@@ -67,24 +45,13 @@ func Test_GetPortalApp(t *testing.T) {
 
 			// Create mock data source
 			mockDS := NewMockDataSource(ctrl)
-			// Create channel for updates
-			updates := make(chan PortalAppUpdate, 10)
 
-			// Set up expectations
-			mockDS.EXPECT().FetchInitialData().Return(getTestPortalApps(), nil).AnyTimes()
-			mockDS.EXPECT().GetUpdateChannel().Return(updates).AnyTimes()
-			mockDS.EXPECT().Close().AnyTimes()
+			// Set up expectations for initial data load
+			mockDS.EXPECT().GetPortalApps().Return(getTestPortalApps(), nil).Times(1)
 
-			// Create store
-			store, err := NewPortalAppStore(polyzero.NewLogger(), mockDS)
+			// Create store with a long refresh interval to avoid interference during test
+			store, err := NewPortalAppStore(polyzero.NewLogger(), mockDS, 1*time.Hour)
 			c.NoError(err)
-
-			// Send updates for this test case
-			if test.update != nil {
-				updates <- *test.update
-				// Allow time for update to be processed
-				time.Sleep(50 * time.Millisecond)
-			}
 
 			portalApp, found := store.GetPortalApp(test.portalAppID)
 			c.Equal(test.expectedPortalAppFound, found)
@@ -109,11 +76,49 @@ func Test_GetPortalApp(t *testing.T) {
 			} else {
 				c.Nil(portalApp)
 			}
-
-			// Close the channel to end the test cleanly
-			close(updates)
 		})
 	}
+}
+
+func Test_BackgroundRefresh(t *testing.T) {
+	c := require.New(t)
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Create mock data source
+	mockDS := NewMockDataSource(ctrl)
+
+	// Initial data load
+	initialApps := getTestPortalApps()
+	mockDS.EXPECT().GetPortalApps().Return(initialApps, nil).Times(1)
+
+	// Updated data that will be returned on refresh
+	updatedApps := getUpdatedTestPortalApps()
+	mockDS.EXPECT().GetPortalApps().Return(updatedApps, nil).MinTimes(1)
+
+	// Create store with short refresh interval for testing
+	refreshInterval := 100 * time.Millisecond
+	store, err := NewPortalAppStore(polyzero.NewLogger(), mockDS, refreshInterval)
+	c.NoError(err)
+
+	// Verify initial state
+	portalApp, found := store.GetPortalApp("portal_app_1_static_key")
+	c.True(found)
+	c.Equal("api_key_1", portalApp.Auth.APIKey)
+
+	// Wait for at least one refresh cycle
+	time.Sleep(refreshInterval + 50*time.Millisecond)
+
+	// Verify the store was updated with new data
+	portalApp, found = store.GetPortalApp("portal_app_1_static_key")
+	c.True(found)
+	c.Equal("updated_api_key_1", portalApp.Auth.APIKey)
+
+	// Verify new app was added
+	newApp, found := store.GetPortalApp("portal_app_3_static_key")
+	c.True(found)
+	c.Equal("new_api_key", newApp.Auth.APIKey)
 }
 
 // getTestPortalApps returns a mock response for the initial portal app store data,
@@ -143,47 +148,39 @@ func getTestPortalApps() map[PortalAppID]*PortalApp {
 	}
 }
 
-// getTestUpdate returns a mock update for a given portal app ID, used to test the portal app store's behavior when updates are received.
-// Will be one of three cases:
-// 1. An existing PortalApp was updated (portal_app_2_no_auth)
-// 2. A new PortalApp was created (portal_app_3_static_key)
-// 3. An existing PortalApp was deleted (portal_app_1_static_key)
-func getTestUpdate(portalAppID string) *PortalAppUpdate {
-	updatesMap := map[string]*PortalAppUpdate{
-		"portal_app_2_no_auth": {
-			PortalAppID: "portal_app_2_no_auth",
-			PortalApp: &PortalApp{
-				ID:        "portal_app_2_no_auth",
-				AccountID: "account_2",
-				Auth:      nil,
-				RateLimit: &RateLimit{
-					PlanType:         "PLAN_UNLIMITED",
-					MonthlyUserLimit: 0,
-				},
+// getUpdatedTestPortalApps returns updated portal app data to simulate a refresh
+func getUpdatedTestPortalApps() map[PortalAppID]*PortalApp {
+	return map[PortalAppID]*PortalApp{
+		"portal_app_1_static_key": {
+			ID:        "portal_app_1_static_key",
+			AccountID: "account_1",
+			Auth: &Auth{
+				APIKey: "updated_api_key_1",
 			},
-			Delete: false,
+			RateLimit: &RateLimit{
+				PlanType:         "PLAN_UNLIMITED",
+				MonthlyUserLimit: 0,
+			},
+		},
+		"portal_app_2_no_auth": {
+			ID:        "portal_app_2_no_auth",
+			AccountID: "account_2",
+			Auth:      nil,
+			RateLimit: &RateLimit{
+				PlanType:         "PLAN_UNLIMITED",
+				MonthlyUserLimit: 0,
+			},
 		},
 		"portal_app_3_static_key": {
-			PortalAppID: "portal_app_3_static_key",
-			PortalApp: &PortalApp{
-				ID:        "portal_app_3_static_key",
-				AccountID: "account_3",
-				Auth: &Auth{
-					APIKey: "new_api_key",
-				},
-				RateLimit: &RateLimit{
-					PlanType:         "PLAN_PRO",
-					MonthlyUserLimit: 1000,
-				},
+			ID:        "portal_app_3_static_key",
+			AccountID: "account_3",
+			Auth: &Auth{
+				APIKey: "new_api_key",
 			},
-			Delete: false,
-		},
-		"portal_app_1_static_key": {
-			PortalAppID: "portal_app_1_static_key",
-			PortalApp:   nil,
-			Delete:      true,
+			RateLimit: &RateLimit{
+				PlanType:         "PLAN_PRO",
+				MonthlyUserLimit: 1000,
+			},
 		},
 	}
-
-	return updatesMap[portalAppID]
 }

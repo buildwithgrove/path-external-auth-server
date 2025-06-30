@@ -43,19 +43,3 @@ GROUP BY
     pas.secret_key_required,
     a.plan_type,
     a.monthly_user_limit;
-
--- name: GetPortalAppChanges :many
-SELECT id,
-    portal_app_id,
-    is_delete
-FROM portal_application_changes
-WHERE processed_at IS NULL;
-
--- name: MarkPortalAppChangesProcessed :exec
-UPDATE portal_application_changes
-SET processed_at = NOW()
-WHERE id = ANY(@change_ids::int[]);
-
--- name: DeleteProcessedPortalAppChanges :exec
-DELETE FROM portal_application_changes
-WHERE processed_at < NOW() - INTERVAL '5 seconds';

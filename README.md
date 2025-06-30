@@ -119,8 +119,9 @@ For more information see:
 
 PEAS is configured via environment variables.
 
-| Variable                   | Required | Type   | Description                                                           | Example                                              | Default Value |
-| -------------------------- | -------- | ------ | --------------------------------------------------------------------- | ---------------------------------------------------- | ------------- |
-| POSTGRES_CONNECTION_STRING | ✅        | string | The PostgreSQL connection string for the database with PortalApp data | postgresql://username:password@localhost:5432/dbname | -             |
-| PORT                       | ❌        | int    | The port to run the external auth server on                           | 10001                                                | 10001         |
-| LOGGER_LEVEL               | ❌        | string | The log level to use for the external auth server                     | info                                                 | info          |
+| Variable                   | Required | Type     | Description                                                           | Example                                              | Default Value |
+| -------------------------- | -------- | -------- | --------------------------------------------------------------------- | ---------------------------------------------------- | ------------- |
+| POSTGRES_CONNECTION_STRING | ✅        | string   | The PostgreSQL connection string for the database with PortalApp data | postgresql://username:password@localhost:5432/dbname | -             |
+| PORT                       | ❌        | int      | The port to run the external auth server on                           | 10001                                                | 10001         |
+| LOGGER_LEVEL               | ❌        | string   | The log level to use for the external auth server                     | info                                                 | info          |
+| REFRESH_INTERVAL           | ❌        | duration | The interval for refreshing portal app data from the database         | 30s, 1m, 2m30s                                       | 30s           |

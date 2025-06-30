@@ -5,6 +5,8 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"time"
+
 	// autoload env vars
 
 	_ "github.com/joho/godotenv/autoload"
@@ -24,6 +26,12 @@ const (
 	//   - Default: "info" if not set
 	loggerLevelEnv     = "LOGGER_LEVEL"
 	defaultLoggerLevel = "info"
+
+	// [OPTIONAL]: Refresh interval for the portal app store.
+	//   - Default: 30s if not set
+	//   - Examples: "30s", "1m", "2m30s"
+	refreshIntervalEnv     = "REFRESH_INTERVAL"
+	defaultRefreshInterval = 30 * time.Second
 )
 
 var postgresConnectionStringRegex = regexp.MustCompile(`^postgres(?:ql)?:\/\/[^:]+:[^@]+@[^:]+:\d+\/[^?]+(?:\?.+)?$`)
@@ -35,6 +43,7 @@ type envVars struct {
 	postgresConnectionString string
 	port                     int
 	loggerLevel              string
+	refreshInterval          time.Duration
 }
 
 // gatherEnvVars:
@@ -60,6 +69,16 @@ func gatherEnvVars() (envVars, error) {
 	loggerLevel := os.Getenv(loggerLevelEnv)
 	if loggerLevel != "" {
 		e.loggerLevel = loggerLevel
+	}
+
+	// Parse refresh interval from environment (if provided)
+	refreshIntervalStr := os.Getenv(refreshIntervalEnv)
+	if refreshIntervalStr != "" {
+		duration, err := time.ParseDuration(refreshIntervalStr)
+		if err != nil {
+			return envVars{}, fmt.Errorf("invalid refresh interval format: %v", err)
+		}
+		e.refreshInterval = duration
 	}
 
 	// Apply defaults for any unset configuration
@@ -98,5 +117,8 @@ func (e *envVars) hydrateDefaults() {
 	}
 	if e.loggerLevel == "" {
 		e.loggerLevel = defaultLoggerLevel
+	}
+	if e.refreshInterval == 0 {
+		e.refreshInterval = defaultRefreshInterval
 	}
 }

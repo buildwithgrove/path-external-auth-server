@@ -42,7 +42,7 @@ func main() {
 	logger.Info().Msg("Successfully connected to postgres as a data source")
 
 	// Create a new portal app store
-	portalAppStore, err := store.NewPortalAppStore(logger, postgresDataSource)
+	portalAppStore, err := store.NewPortalAppStore(logger, postgresDataSource, env.refreshInterval)
 	if err != nil {
 		panic(err)
 	}
