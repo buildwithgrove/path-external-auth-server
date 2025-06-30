@@ -21,6 +21,7 @@ func main() {
 	if err != nil {
 		panic(fmt.Errorf("failed to gather environment variables: %v", err))
 	}
+	fmt.Println("💻 Log Level: ", env.loggerLevel)
 
 	loggerOpts := []polylog.LoggerOption{
 		polyzero.WithLevel(polyzero.ParseLevel(env.loggerLevel)),
@@ -39,7 +40,7 @@ func main() {
 	}
 	defer postgresDataSource.Close()
 
-	logger.Info().Msg("Successfully connected to postgres as a data source")
+	logger.Info().Msg("🐘 Successfully connected to postgres as a data source")
 
 	// Create a new portal app store
 	portalAppStore, err := store.NewPortalAppStore(logger, postgresDataSource, env.refreshInterval)

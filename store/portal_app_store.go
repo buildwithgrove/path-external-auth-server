@@ -79,7 +79,7 @@ func (c *portalAppStore) initializeStore() error {
 		return fmt.Errorf("failed to get initial data from data source: %w", err)
 	}
 
-	c.logger.Info().Msg("Successfully fetched initial data from data source")
+	c.logger.Info().Msg("🌱 Successfully fetched initial data from data source")
 
 	c.portalAppsMu.Lock()
 	defer c.portalAppsMu.Unlock()
@@ -92,7 +92,7 @@ func (c *portalAppStore) initializeStore() error {
 func (c *portalAppStore) startBackgroundRefresh(refreshInterval time.Duration) {
 	c.logger.Info().
 		Dur("refresh_interval", refreshInterval).
-		Msg("Starting background refresh for portal apps")
+		Msg("🗄️ Starting background refresh for portal apps")
 
 	ticker := time.NewTicker(refreshInterval)
 	defer ticker.Stop()
@@ -119,9 +119,9 @@ func (c *portalAppStore) refreshStore() error {
 	defer c.portalAppsMu.Unlock()
 	c.portalApps = portalApps
 
-	c.logger.Debug().
+	c.logger.Info().
 		Int("portal_app_count", len(portalApps)).
-		Msg("Successfully refreshed portal apps")
+		Msg("🌿 Successfully refreshed portal apps from data source")
 
 	return nil
 }

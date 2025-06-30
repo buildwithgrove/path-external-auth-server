@@ -94,14 +94,14 @@ func isValidPostgresConnectionString(s string) bool {
 
 // GetPortalApps loads the full set of PortalApps from the Postgres database.
 func (d *GrovePostgresDriver) GetPortalApps() (map[store.PortalAppID]*store.PortalApp, error) {
-	d.logger.Info().Msg("Executing SelectPortalApps query...")
+	d.logger.Info().Msg("💾 Executing SelectPortalApps query...")
 	rows, err := d.driver.Queries.SelectPortalApps(context.Background())
 	if err != nil {
 		d.logger.Error().Err(err).Msg("failed to fetch portal applications from database")
 		return nil, fmt.Errorf("failed to fetch portal applications: %w", err)
 	}
 
-	d.logger.Info().Int("num_rows", len(rows)).Msg("Successfully fetched initial data from Postgres")
+	d.logger.Info().Int("num_rows", len(rows)).Msg("✅ Successfully fetched initial data from Postgres")
 
 	return sqlcPortalAppsToPortalApps(rows), nil
 }
