@@ -1,9 +1,9 @@
 package store
 
 import (
-	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/pokt-network/poktroll/pkg/polylog"
 )
@@ -36,6 +36,7 @@ type portalAppStore struct {
 func NewPortalAppStore(
 	logger polylog.Logger,
 	dataSource DataSource,
+	refreshInterval time.Duration,
 ) (*portalAppStore, error) {
 	store := &portalAppStore{
 		logger:       logger.With("component", "portal_app_data_store"),
@@ -50,8 +51,8 @@ func NewPortalAppStore(
 		return nil, fmt.Errorf("failed to initialize portal app store: %w", err)
 	}
 
-	// Start a background goroutine to listen for live updates
-	go store.listenForUpdates(context.Background())
+	// Start background refresh goroutine
+	go store.startBackgroundRefresh(refreshInterval)
 
 	return store, nil
 }
@@ -73,12 +74,12 @@ func (c *portalAppStore) GetPortalApp(portalAppID PortalAppID) (*PortalApp, bool
 func (c *portalAppStore) initializeStore() error {
 	c.logger.Info().Msg("Fetching initial data from data source ...")
 
-	portalApps, err := c.dataSource.FetchInitialData()
+	portalApps, err := c.dataSource.GetPortalApps()
 	if err != nil {
 		return fmt.Errorf("failed to get initial data from data source: %w", err)
 	}
 
-	c.logger.Info().Msg("Successfully fetched initial data from data source")
+	c.logger.Info().Msg("🌱 Successfully fetched initial data from data source")
 
 	c.portalAppsMu.Lock()
 	defer c.portalAppsMu.Unlock()
@@ -87,36 +88,43 @@ func (c *portalAppStore) initializeStore() error {
 	return nil
 }
 
-// listenForUpdates continuously listens for portal app updates from the data source and applies them to the store.
-//
-// Update cases handled:
-// - New PortalApp created
-// - Existing PortalApp updated
-// - Existing PortalApp deleted
-//
-// Exits when the context is cancelled.
-func (c *portalAppStore) listenForUpdates(ctx context.Context) {
-	updatesCh := c.dataSource.GetUpdateChannel()
+// startBackgroundRefresh starts a goroutine that periodically refreshes the portal apps from the data source.
+func (c *portalAppStore) startBackgroundRefresh(refreshInterval time.Duration) {
+	c.logger.Info().
+		Dur("refresh_interval", refreshInterval).
+		Msg("🗄️ Starting background refresh for portal apps")
 
-	for {
-		select {
-		case <-ctx.Done():
-			// Stop listening for updates if the context is cancelled
-			c.logger.Info().Msg("context cancelled, stopping update listener")
-			return
+	ticker := time.NewTicker(refreshInterval)
+	defer ticker.Stop()
 
-		case update := <-updatesCh:
-			c.portalAppsMu.Lock()
-			if update.Delete {
-				// Remove PortalApp from store if marked for deletion
-				delete(c.portalApps, update.PortalAppID)
-				c.logger.Info().Str("portal_app_id", string(update.PortalAppID)).Msg("deleted portal app")
-			} else {
-				// Add or update PortalApp in store
-				c.portalApps[update.PortalAppID] = update.PortalApp
-				c.logger.Info().Str("portal_app_id", string(update.PortalAppID)).Msg("updated portal app")
-			}
-			c.portalAppsMu.Unlock()
+	for range ticker.C {
+		if err := c.refreshStore(); err != nil {
+			c.logger.Error().
+				Err(err).
+				Msg("Failed to refresh portal apps from data source")
 		}
 	}
+}
+
+// refreshStore fetches the latest PortalApps from the data source and updates the in-memory store.
+func (c *portalAppStore) refreshStore() error {
+	startTime := time.Now()
+	c.logger.Debug().Msg("💡 Refreshing portal apps from data source")
+
+	portalApps, err := c.dataSource.GetPortalApps()
+	if err != nil {
+		return fmt.Errorf("failed to get portal apps from data source: %w", err)
+	}
+
+	c.portalAppsMu.Lock()
+	defer c.portalAppsMu.Unlock()
+	c.portalApps = portalApps
+
+	refreshDuration := time.Since(startTime)
+	c.logger.Debug().
+		Int("portal_app_count", len(portalApps)).
+		Int64("refresh_duration_ms", refreshDuration.Milliseconds()).
+		Msg("🌿 Successfully refreshed portal apps from data source")
+
+	return nil
 }

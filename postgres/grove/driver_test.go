@@ -31,7 +31,7 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
-func Test_Integration_FetchAuthDataSync(t *testing.T) {
+func Test_Integration_GetPortalApps(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping driver integration test")
 	}
@@ -103,7 +103,7 @@ func Test_Integration_FetchAuthDataSync(t *testing.T) {
 			dataSource, err := NewGrovePostgresDriver(polyzero.NewLogger(), connectionString)
 			c.NoError(err)
 
-			authData, err := dataSource.FetchInitialData()
+			authData, err := dataSource.GetPortalApps()
 			c.NoError(err)
 			c.Equal(test.expected, authData)
 		})

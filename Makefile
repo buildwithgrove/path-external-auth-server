@@ -33,7 +33,7 @@ test_unit: ## Runs unit tests only (excludes Postgres Docker integration tests)
 
 .PHONY: gen_mocks
 gen_mocks: ## Generates the mocks for the project
-	mockgen -source=./portal_app_store/data_source.go -destination=./portal_app_store/data_source_mock_test.go -package=portalappstore
+	mockgen -source=./store/data_source.go -destination=./store/data_source_mock_test.go -package=store
 
 #############################
 ### SQL Generator Targets ###

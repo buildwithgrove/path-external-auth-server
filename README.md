@@ -12,6 +12,9 @@
   - [`PortalApp` Structure](#portalapp-structure)
 - [Request Headers](#request-headers)
 - [Rate Limiting Implementation](#rate-limiting-implementation)
+- [Portal App Store Refresh](#portal-app-store-refresh)
+  - [How It Works](#how-it-works)
+  - [Configuration](#configuration)
 - [Envoy Gateway Integration](#envoy-gateway-integration)
 - [PEAS Environment Variables](#peas-environment-variables)
 
@@ -100,6 +103,25 @@ PEAS provides rate limiting capabilities through the following mechanisms:
 
 These headers are processed by the Envoy rate limiter configured in the GUARD system, allowing for granular control over request rates.
 
+## Portal App Store Refresh
+
+PEAS maintains an in-memory store of portal app data for fast authorization lookups. This store is automatically refreshed from the Grove Portal Database on a configurable interval.
+
+### How It Works
+
+1. **Initial Load**: On startup, PEAS fetches all portal app data from the database to populate the in-memory store
+2. **Background Refresh**: A background goroutine periodically refreshes the store by fetching the latest data from the database
+3. **Thread-Safe Updates**: The store uses read-write locks to ensure thread-safe access during refresh operations
+4. **Performance Monitoring**: Each refresh operation is timed and logged with metrics for monitoring
+
+### Configuration
+
+The refresh interval is configurable via the `REFRESH_INTERVAL` environment variable:
+
+- **Default**: 30 seconds
+- **Format**: Duration string (e.g., `30s`, `1m`, `2m30s`)
+- **Purpose**: Balance between data freshness and database load
+
 ## Envoy Gateway Integration
 
 PEAS exposes a gRPC service that adheres to the spec expected by Envoy Proxy's `ext_authz` HTTP Filter.
@@ -119,8 +141,9 @@ For more information see:
 
 PEAS is configured via environment variables.
 
-| Variable                   | Required | Type   | Description                                                           | Example                                              | Default Value |
-| -------------------------- | -------- | ------ | --------------------------------------------------------------------- | ---------------------------------------------------- | ------------- |
-| POSTGRES_CONNECTION_STRING | ✅        | string | The PostgreSQL connection string for the database with PortalApp data | postgresql://username:password@localhost:5432/dbname | -             |
-| PORT                       | ❌        | int    | The port to run the external auth server on                           | 10001                                                | 10001         |
-| LOGGER_LEVEL               | ❌        | string | The log level to use for the external auth server                     | info                                                 | info          |
+| Variable                   | Required | Type     | Description                                                           | Example                                              | Default Value |
+| -------------------------- | -------- | -------- | --------------------------------------------------------------------- | ---------------------------------------------------- | ------------- |
+| POSTGRES_CONNECTION_STRING | ✅        | string   | The PostgreSQL connection string for the database with PortalApp data | postgresql://username:password@localhost:5432/dbname | -             |
+| PORT                       | ❌        | int      | The port to run the external auth server on                           | 10001                                                | 10001         |
+| LOGGER_LEVEL               | ❌        | string   | The log level to use for the external auth server                     | info                                                 | info          |
+| REFRESH_INTERVAL           | ❌        | duration | The interval for refreshing portal app data from the database         | 30s, 1m, 2m30s                                       | 30s           |
