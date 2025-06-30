@@ -2,7 +2,6 @@ package store
 
 import (
 	"testing"
-	"time"
 
 	"github.com/pokt-network/poktroll/pkg/polylog/polyzero"
 	"github.com/stretchr/testify/require"
@@ -15,7 +14,6 @@ func Test_GetPortalApp(t *testing.T) {
 		portalAppID            PortalAppID
 		expectedPortalApp      *PortalApp
 		expectedPortalAppFound bool
-		update                 *PortalAppUpdate
 	}{
 		{
 			name:                   "should return portal app when found",
@@ -28,27 +26,6 @@ func Test_GetPortalApp(t *testing.T) {
 			portalAppID:            "portal_app_2_no_auth",
 			expectedPortalApp:      getTestPortalApps()["portal_app_2_no_auth"],
 			expectedPortalAppFound: true,
-		},
-		{
-			name:                   "should return brand new portal app when update is received for new portal",
-			portalAppID:            "portal_app_3_static_key",
-			update:                 getTestUpdate("portal_app_3_static_key"),
-			expectedPortalApp:      getTestUpdate("portal_app_3_static_key").PortalApp,
-			expectedPortalAppFound: true,
-		},
-		{
-			name:                   "should return updated existing portal app when update is received for existing portal",
-			portalAppID:            "portal_app_2_no_auth",
-			update:                 getTestUpdate("portal_app_2_no_auth"),
-			expectedPortalApp:      getTestUpdate("portal_app_2_no_auth").PortalApp,
-			expectedPortalAppFound: true,
-		},
-		{
-			name:                   "should not return portal app when update is received to delete portal",
-			portalAppID:            "portal_app_1_static_key",
-			update:                 getTestUpdate("portal_app_1_static_key"),
-			expectedPortalApp:      nil,
-			expectedPortalAppFound: false,
 		},
 		{
 			name:                   "should return false when portal app not found",
@@ -67,25 +44,16 @@ func Test_GetPortalApp(t *testing.T) {
 
 			// Create mock data source
 			mockDS := NewMockDataSource(ctrl)
-			// Create channel for updates
-			updates := make(chan PortalAppUpdate, 10)
 
-			// Set up expectations
+			// Set up expectations - only need FetchInitialData for periodic refresh
 			mockDS.EXPECT().FetchInitialData().Return(getTestPortalApps(), nil).AnyTimes()
-			mockDS.EXPECT().GetUpdateChannel().Return(updates).AnyTimes()
-			mockDS.EXPECT().Close().AnyTimes()
 
 			// Create store
 			store, err := NewPortalAppStore(polyzero.NewLogger(), mockDS)
 			c.NoError(err)
+			defer store.Stop()
 
-			// Send updates for this test case
-			if test.update != nil {
-				updates <- *test.update
-				// Allow time for update to be processed
-				time.Sleep(50 * time.Millisecond)
-			}
-
+			// Test GetPortalApp
 			portalApp, found := store.GetPortalApp(test.portalAppID)
 			c.Equal(test.expectedPortalAppFound, found)
 
@@ -109,11 +77,51 @@ func Test_GetPortalApp(t *testing.T) {
 			} else {
 				c.Nil(portalApp)
 			}
-
-			// Close the channel to end the test cleanly
-			close(updates)
 		})
 	}
+}
+
+func Test_PeriodicRefresh(t *testing.T) {
+	c := require.New(t)
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Create mock data source
+	mockDS := NewMockDataSource(ctrl)
+
+	// Initial data
+	initialData := getTestPortalApps()
+
+	// Set up expectations - only expect the initial call since we can't easily test
+	// the 30-second periodic refresh without making the interval configurable
+	mockDS.EXPECT().FetchInitialData().Return(initialData, nil).Times(1)
+
+	// Create store
+	store, err := NewPortalAppStore(polyzero.NewLogger(), mockDS)
+	c.NoError(err)
+	defer store.Stop()
+
+	// Verify initial state
+	portalApp1, found1 := store.GetPortalApp("portal_app_1_static_key")
+	c.True(found1)
+	c.Equal(PortalAppID("portal_app_1_static_key"), portalApp1.ID)
+
+	portalApp2, found2 := store.GetPortalApp("portal_app_2_no_auth")
+	c.True(found2)
+	c.Equal(PortalAppID("portal_app_2_no_auth"), portalApp2.ID)
+
+	portalApp3, found3 := store.GetPortalApp("portal_app_3_new")
+	c.False(found3)
+	c.Nil(portalApp3)
+
+	// TODO_TECHDEBT(@adshmh): Testing the actual periodic refresh (30-second timer) would require:
+	// 1. Making the refresh interval configurable for testing, or
+	// 2. Dependency injection for the ticker, or
+	// 3. More complex mocking setup
+	//
+	// For now, this test verifies the store initializes correctly and basic
+	// GetPortalApp functionality works as expected.
 }
 
 // getTestPortalApps returns a mock response for the initial portal app store data,
@@ -141,49 +149,4 @@ func getTestPortalApps() map[PortalAppID]*PortalApp {
 			},
 		},
 	}
-}
-
-// getTestUpdate returns a mock update for a given portal app ID, used to test the portal app store's behavior when updates are received.
-// Will be one of three cases:
-// 1. An existing PortalApp was updated (portal_app_2_no_auth)
-// 2. A new PortalApp was created (portal_app_3_static_key)
-// 3. An existing PortalApp was deleted (portal_app_1_static_key)
-func getTestUpdate(portalAppID string) *PortalAppUpdate {
-	updatesMap := map[string]*PortalAppUpdate{
-		"portal_app_2_no_auth": {
-			PortalAppID: "portal_app_2_no_auth",
-			PortalApp: &PortalApp{
-				ID:        "portal_app_2_no_auth",
-				AccountID: "account_2",
-				Auth:      nil,
-				RateLimit: &RateLimit{
-					PlanType:         "PLAN_UNLIMITED",
-					MonthlyUserLimit: 0,
-				},
-			},
-			Delete: false,
-		},
-		"portal_app_3_static_key": {
-			PortalAppID: "portal_app_3_static_key",
-			PortalApp: &PortalApp{
-				ID:        "portal_app_3_static_key",
-				AccountID: "account_3",
-				Auth: &Auth{
-					APIKey: "new_api_key",
-				},
-				RateLimit: &RateLimit{
-					PlanType:         "PLAN_PRO",
-					MonthlyUserLimit: 1000,
-				},
-			},
-			Delete: false,
-		},
-		"portal_app_1_static_key": {
-			PortalAppID: "portal_app_1_static_key",
-			PortalApp:   nil,
-			Delete:      true,
-		},
-	}
-
-	return updatesMap[portalAppID]
 }
