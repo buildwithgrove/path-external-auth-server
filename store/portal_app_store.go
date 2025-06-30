@@ -108,7 +108,8 @@ func (c *portalAppStore) startBackgroundRefresh(refreshInterval time.Duration) {
 
 // refreshStore fetches the latest PortalApps from the data source and updates the in-memory store.
 func (c *portalAppStore) refreshStore() error {
-	c.logger.Debug().Msg("Refreshing portal apps from data source")
+	startTime := time.Now()
+	c.logger.Debug().Msg("💡 Refreshing portal apps from data source")
 
 	portalApps, err := c.dataSource.GetPortalApps()
 	if err != nil {
@@ -119,8 +120,10 @@ func (c *portalAppStore) refreshStore() error {
 	defer c.portalAppsMu.Unlock()
 	c.portalApps = portalApps
 
-	c.logger.Info().
+	refreshDuration := time.Since(startTime)
+	c.logger.Debug().
 		Int("portal_app_count", len(portalApps)).
+		Int64("refresh_duration_ms", refreshDuration.Milliseconds()).
 		Msg("🌿 Successfully refreshed portal apps from data source")
 
 	return nil
