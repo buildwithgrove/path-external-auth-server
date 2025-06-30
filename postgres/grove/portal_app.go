@@ -33,21 +33,6 @@ func sqlcPortalAppsToPortalAppRow(r sqlc.SelectPortalAppsRow) *portalApplication
 	}
 }
 
-// sqlcPortalAppToPortalAppRow (not the singularity of App) converts a row from the
-// `SelectPortalAppRow` query to the intermediate portalApplicationRow struct.
-// This is necessary because SQLC generates a specific struct for each query, which needs
-// to be converted to a common struct before converting to the store.PortalApp struct.
-func sqlcPortalAppToPortalAppRow(r sqlc.SelectPortalAppRow) *portalApplicationRow {
-	return &portalApplicationRow{
-		ID:                r.ID,
-		AccountID:         r.AccountID.String,
-		SecretKey:         r.SecretKey.String,
-		SecretKeyRequired: r.SecretKeyRequired.Bool,
-		Plan:              store.PlanType(r.Plan.String),
-		MonthlyUserLimit:  r.MonthlyUserLimit.Int32,
-	}
-}
-
 func (r *portalApplicationRow) convertToPortalApp() *store.PortalApp {
 	return &store.PortalApp{
 		ID:        store.PortalAppID(r.ID),
