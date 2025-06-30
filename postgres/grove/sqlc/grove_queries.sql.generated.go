@@ -11,51 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const selectPortalApp = `-- name: SelectPortalApp :one
-SELECT 
-    pa.id,
-    pas.secret_key,
-    pas.secret_key_required,
-    pa.account_id,
-    a.plan_type AS plan,
-    a.monthly_user_limit
-FROM portal_applications pa
-LEFT JOIN portal_application_settings pas
-    ON pa.id = pas.application_id
-LEFT JOIN accounts a 
-    ON pa.account_id = a.id
-WHERE pa.id = $1 AND pa.deleted = false
-GROUP BY 
-    pa.id,
-    pas.secret_key,
-    pas.secret_key_required,
-    a.plan_type,
-    a.monthly_user_limit
-`
-
-type SelectPortalAppRow struct {
-	ID                string      `json:"id"`
-	SecretKey         pgtype.Text `json:"secret_key"`
-	SecretKeyRequired pgtype.Bool `json:"secret_key_required"`
-	AccountID         pgtype.Text `json:"account_id"`
-	Plan              pgtype.Text `json:"plan"`
-	MonthlyUserLimit  pgtype.Int4 `json:"monthly_user_limit"`
-}
-
-func (q *Queries) SelectPortalApp(ctx context.Context, id string) (SelectPortalAppRow, error) {
-	row := q.db.QueryRow(ctx, selectPortalApp, id)
-	var i SelectPortalAppRow
-	err := row.Scan(
-		&i.ID,
-		&i.SecretKey,
-		&i.SecretKeyRequired,
-		&i.AccountID,
-		&i.Plan,
-		&i.MonthlyUserLimit,
-	)
-	return i, err
-}
-
 const selectPortalApps = `-- name: SelectPortalApps :many
 
 SELECT 
