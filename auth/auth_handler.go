@@ -18,7 +18,6 @@ import (
 	"google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
 
-	"github.com/buildwithgrove/path-external-auth-server/ratelimit"
 	"github.com/buildwithgrove/path-external-auth-server/store"
 )
 
@@ -44,6 +43,10 @@ type PortalAppStore interface {
 	GetPortalApp(portalAppID store.PortalAppID) (*store.PortalApp, bool)
 }
 
+type RateLimitStore interface {
+	IsAccountRateLimited(accountID store.AccountID) bool
+}
+
 // AuthHandler processes requests from Envoy.
 //
 // Primary responsibilities:
@@ -53,6 +56,9 @@ type AuthHandler struct {
 
 	// PortalAppStore: in-memory store of PortalApps
 	PortalAppStore PortalAppStore
+
+	// RateLimitStore: used for checking if an account is rate limited
+	RateLimitStore RateLimitStore
 
 	// APIKeyAuthorizer: used for request authorization
 	APIKeyAuthorizer Authorizer
@@ -116,6 +122,12 @@ func (a *AuthHandler) Check(
 		return getDeniedCheckResponse(err.Error(), envoy_type.StatusCode_Unauthorized), nil
 	}
 
+	// Check if the account is rate limited
+	if err := a.checkAccountRateLimit(portalApp); err != nil {
+		logger.Info().Msg("account is rate limited: rejecting the request.")
+		return getDeniedCheckResponse("account is rate limited", envoy_type.StatusCode_TooManyRequests), nil
+	}
+
 	// Add portal app ID, account ID, and rate limiting values to the headers
 	// to be passed upstream along the filter chain to the rate limiter.
 	httpHeaders := a.getHTTPHeaders(portalApp)
@@ -163,6 +175,19 @@ func (a *AuthHandler) authPortalApp(headers http.Header, portalApp *store.Portal
 	return a.APIKeyAuthorizer.authorizeRequest(headers, portalApp)
 }
 
+// checkRateLimit checks if the account is rate limited.
+// - Returns nil if the account is not eligible for rate limiting.
+// - Returns an error if the account is rate limited.
+func (a *AuthHandler) checkAccountRateLimit(portalApp *store.PortalApp) error {
+	if portalApp.RateLimit == nil {
+		return nil
+	}
+	if a.RateLimitStore.IsAccountRateLimited(portalApp.AccountID) {
+		return fmt.Errorf("account is rate limited")
+	}
+	return nil
+}
+
 // getHTTPHeaders sets all HTTP headers required by the PATH services on the request being forwarded.
 // - Adds portal app ID header on all requests ("Portal-Application-ID: <id>")
 // - Adds account ID header on all requests ("Portal-Account-ID: <id>")
@@ -181,10 +206,6 @@ func (a *AuthHandler) getHTTPHeaders(portalApp *store.PortalApp) []*envoy_core.H
 				Value: string(portalApp.AccountID),
 			},
 		},
-	}
-
-	if rateLimitHeader := ratelimit.GetRateLimitRequestHeader(portalApp); rateLimitHeader != nil {
-		headers = append(headers, rateLimitHeader)
 	}
 
 	return headers

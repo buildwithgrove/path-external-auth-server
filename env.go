@@ -17,6 +17,10 @@ const (
 	//   - Example: "postgresql://username:password@localhost:5432/dbname"
 	postgresConnectionStringEnv = "POSTGRES_CONNECTION_STRING"
 
+	// [REQUIRED]: GCP project ID for the data warehouse used by the rate limit store.
+	//   - Example: "your-project-id"
+	gcpProjectIDEnv = "GCP_PROJECT_ID"
+
 	// [OPTIONAL]: Port to run the external auth server on.
 	//   - Default: 10001 if not set
 	portEnv     = "PORT"
@@ -41,6 +45,7 @@ var postgresConnectionStringRegex = regexp.MustCompile(`^postgres(?:ql)?:\/\/[^:
 //   - Use gatherEnvVars to load, validate, and hydrate defaults from environment variables.
 type envVars struct {
 	postgresConnectionString string
+	gcpProjectID             string
 	port                     int
 	loggerLevel              string
 	refreshInterval          time.Duration
@@ -53,6 +58,7 @@ func gatherEnvVars() (envVars, error) {
 	// Initialize with Postgres connection string from environment
 	e := envVars{
 		postgresConnectionString: os.Getenv(postgresConnectionStringEnv),
+		gcpProjectID:             os.Getenv(gcpProjectIDEnv),
 	}
 
 	// Parse port environment variable (if provided)
@@ -96,6 +102,11 @@ func (e *envVars) validate() error {
 	// Postgres connection string must be set
 	if e.postgresConnectionString == "" {
 		return fmt.Errorf("%s is not set", postgresConnectionStringEnv)
+	}
+
+	// GCP project ID must be set
+	if e.gcpProjectID == "" {
+		return fmt.Errorf("%s is not set", gcpProjectIDEnv)
 	}
 
 	// Connection string must match expected format

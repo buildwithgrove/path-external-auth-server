@@ -11,6 +11,7 @@ import (
 
 	"github.com/buildwithgrove/path-external-auth-server/auth"
 	"github.com/buildwithgrove/path-external-auth-server/postgres/grove"
+	"github.com/buildwithgrove/path-external-auth-server/ratelimit"
 	"github.com/buildwithgrove/path-external-auth-server/store"
 )
 
@@ -48,6 +49,12 @@ func main() {
 		panic(err)
 	}
 
+	// Create a new rate limit store
+	rateLimitStore, err := ratelimit.NewRateLimitStore(logger, env.gcpProjectID, portalAppStore)
+	if err != nil {
+		panic(err)
+	}
+
 	logger.Info().Msg("Successfully initialized portal app store")
 
 	// Create a new listener to listen for requests from GUARD
@@ -60,6 +67,7 @@ func main() {
 	authHandler := &auth.AuthHandler{
 		Logger:           logger,
 		PortalAppStore:   portalAppStore,
+		RateLimitStore:   rateLimitStore,
 		APIKeyAuthorizer: &auth.AuthorizerAPIKey{},
 	}
 
