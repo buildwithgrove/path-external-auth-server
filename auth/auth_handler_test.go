@@ -281,14 +281,14 @@ func Test_Check(t *testing.T) {
 			expectedResp: &envoy_auth.CheckResponse{
 				Status: &status.Status{
 					Code:    int32(codes.PermissionDenied),
-					Message: "account is rate limited",
+					Message: accountRateLimitMessage,
 				},
 				HttpResponse: &envoy_auth.CheckResponse_DeniedResponse{
 					DeniedResponse: &envoy_auth.DeniedHttpResponse{
 						Status: &envoy_type.HttpStatus{
 							Code: envoy_type.StatusCode_TooManyRequests,
 						},
-						Body: `{"code": 429, "message": "account is rate limited"}`,
+						Body: fmt.Sprintf(`{"code": 429, "message": "%s"}`, accountRateLimitMessage),
 					},
 				},
 			},

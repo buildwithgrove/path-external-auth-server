@@ -62,11 +62,6 @@ peas_run: load_env peas_build ## Run the PEAS binary as a standalone binary
 peas_build: ## Build the PEAS binary locally (does not run anything)
 	go build -o bin/peas .
 
-.PHONY: peas_logs
-peas_logs: ## Run PEAS and format JSON logs with jq (press Ctrl+C to stop)
-	@echo "🚀 Starting PEAS with formatted logs (Ctrl+C to stop)..."
-	@make peas_run | grep "^{" | jq -R 'fromjson' || true
-
 .PHONY: load_env
 load_env: ## Load and validate environment variables from .env file
 	@if [ -f .env ]; then \

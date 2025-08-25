@@ -20,6 +20,8 @@ import (
 	"github.com/buildwithgrove/path-external-auth-server/store"
 )
 
+const accountRateLimitMessage = "This account is rate limited. To upgrade your plan or modify your account settings, log in to your account at https://portal.grove.city/"
+
 const (
 	// TODO_TECHDEBT(@commoddity): This path segment should be configurable via a single source of truth.
 	// - Referred to in multiple places (e.g. GUARD Helm charts, PATH's router.go, and here)
@@ -123,7 +125,7 @@ func (a *AuthHandler) Check(
 	// Check if the Account is rate limited
 	if err := a.checkAccountRateLimited(portalApp); err != nil {
 		logger.Debug().Msg("🚫 account is rate limited: rejecting the request.")
-		return getDeniedCheckResponse("account is rate limited", envoy_type.StatusCode_TooManyRequests), nil
+		return getDeniedCheckResponse(accountRateLimitMessage, envoy_type.StatusCode_TooManyRequests), nil
 	}
 
 	// Add Portal Application ID and Account ID to the headers

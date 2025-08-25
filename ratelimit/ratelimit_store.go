@@ -15,14 +15,17 @@ import (
 // TODO_IMPROVE(@commoddity): Get this from the database
 const freeTierMonthlyUserLimit = 150_000
 
+// accountRateLimitStore interface provides an in-memory store of account rate limits.
 type accountRateLimitStore interface {
 	GetAccountRateLimits(accountID store.AccountID) (store.RateLimit, bool)
 }
 
+// dataWarehouseDriver interface provides a driver for fetching monthly usage data from the data warehouse.
 type dataWarehouseDriver interface {
 	GetMonthToMomentUsage(ctx context.Context, minRelayThreshold int64) (map[string]int64, error)
 }
 
+// rateLimitStore provides an in-memory store of rate limited accounts.
 type rateLimitStore struct {
 	logger polylog.Logger
 
@@ -61,9 +64,6 @@ func NewRateLimitStore(
 	return rls, nil
 }
 
-// TODO_IN_THIS_PR(@commoddity): return more specific error message for user,
-// that shows more details about the rate limit and directs them to the Portal UI.
-//
 // IsAccountRateLimited checks if an account is currently rate limited.
 func (rls *rateLimitStore) IsAccountRateLimited(accountID store.AccountID) bool {
 	rls.rateLimitedAccountsMu.RLock()
