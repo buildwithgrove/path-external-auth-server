@@ -81,7 +81,7 @@ func (c *portalAppStore) GetPortalApp(portalAppID PortalAppID) (*PortalApp, bool
 // Returns:
 // - The RateLimit pointer if found
 // - A bool indicating if the RateLimit exists in the store
-func (c *portalAppStore) GetAccountRateLimits(accountID AccountID) (RateLimit, bool) {
+func (c *portalAppStore) GetAccountRateLimit(accountID AccountID) (RateLimit, bool) {
 	c.accountRateLimitsMu.RLock()
 	defer c.accountRateLimitsMu.RUnlock()
 

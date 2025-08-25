@@ -83,28 +83,28 @@ func TestIsAccountRateLimited(t *testing.T) {
 	tests := []struct {
 		name                  string
 		accountID             store.AccountID
-		rateLimitedAccounts   map[store.AccountID]struct{}
+		rateLimitedAccounts   map[store.AccountID]bool
 		expectedIsRateLimited bool
 	}{
 		{
 			name:      "should return true if account is rate limited",
 			accountID: "rate_limited_account",
-			rateLimitedAccounts: map[store.AccountID]struct{}{
-				"rate_limited_account": {},
+			rateLimitedAccounts: map[store.AccountID]bool{
+				"rate_limited_account": true,
 			},
 			expectedIsRateLimited: true,
 		},
 		{
 			name:                  "should return false if account is not rate limited",
 			accountID:             "normal_account",
-			rateLimitedAccounts:   map[store.AccountID]struct{}{},
+			rateLimitedAccounts:   map[store.AccountID]bool{},
 			expectedIsRateLimited: false,
 		},
 		{
 			name:      "should return false if account is not in rate limited map",
 			accountID: "another_account",
-			rateLimitedAccounts: map[store.AccountID]struct{}{
-				"rate_limited_account": {},
+			rateLimitedAccounts: map[store.AccountID]bool{
+				"rate_limited_account": true,
 			},
 			expectedIsRateLimited: false,
 		},
@@ -142,7 +142,7 @@ func TestUpdateRateLimitedAccounts(t *testing.T) {
 					Return(usageData, nil)
 
 				mockAccountStore.EXPECT().
-					GetAccountRateLimits(store.AccountID("free_account_over_limit")).
+					GetAccountRateLimit(store.AccountID("free_account_over_limit")).
 					Return(store.RateLimit{
 						PlanType:         grovedb.PlanFree_DatabaseType,
 						MonthlyUserLimit: 0,
@@ -162,7 +162,7 @@ func TestUpdateRateLimitedAccounts(t *testing.T) {
 					Return(usageData, nil)
 
 				mockAccountStore.EXPECT().
-					GetAccountRateLimits(store.AccountID("free_account_under_limit")).
+					GetAccountRateLimit(store.AccountID("free_account_under_limit")).
 					Return(store.RateLimit{
 						PlanType:         grovedb.PlanFree_DatabaseType,
 						MonthlyUserLimit: 0,
@@ -182,9 +182,9 @@ func TestUpdateRateLimitedAccounts(t *testing.T) {
 					Return(usageData, nil)
 
 				mockAccountStore.EXPECT().
-					GetAccountRateLimits(store.AccountID("unlimited_account_over_custom_limit")).
+					GetAccountRateLimit(store.AccountID("unlimited_account_over_custom_limit")).
 					Return(store.RateLimit{
-						PlanType:         grovedb.PlanUnlimited_Database,
+						PlanType:         grovedb.PlanUnlimited_DatabaseType,
 						MonthlyUserLimit: 400_000,
 					}, true)
 			},
@@ -202,9 +202,9 @@ func TestUpdateRateLimitedAccounts(t *testing.T) {
 					Return(usageData, nil)
 
 				mockAccountStore.EXPECT().
-					GetAccountRateLimits(store.AccountID("unlimited_account_no_limit")).
+					GetAccountRateLimit(store.AccountID("unlimited_account_no_limit")).
 					Return(store.RateLimit{
-						PlanType:         grovedb.PlanUnlimited_Database,
+						PlanType:         grovedb.PlanUnlimited_DatabaseType,
 						MonthlyUserLimit: 0, // No limit set
 					}, true)
 			},
@@ -222,7 +222,7 @@ func TestUpdateRateLimitedAccounts(t *testing.T) {
 					Return(usageData, nil)
 
 				mockAccountStore.EXPECT().
-					GetAccountRateLimits(store.AccountID("account_without_config")).
+					GetAccountRateLimit(store.AccountID("account_without_config")).
 					Return(store.RateLimit{}, false)
 			},
 			expectedRateLimitedCount: 0,
@@ -239,7 +239,7 @@ func TestUpdateRateLimitedAccounts(t *testing.T) {
 					Return(usageData, nil)
 
 				mockAccountStore.EXPECT().
-					GetAccountRateLimits(store.AccountID("account_unknown_plan")).
+					GetAccountRateLimit(store.AccountID("account_unknown_plan")).
 					Return(store.RateLimit{
 						PlanType:         "PLAN_UNKNOWN",
 						MonthlyUserLimit: 100_000,
@@ -276,7 +276,7 @@ func TestUpdateRateLimitedAccounts(t *testing.T) {
 				logger:                polyzero.NewLogger(),
 				dataWarehouseDriver:   mockDWH,
 				accountRateLimitStore: mockAccountStore,
-				rateLimitedAccounts:   make(map[store.AccountID]struct{}),
+				rateLimitedAccounts:   make(map[store.AccountID]bool),
 			}
 
 			err := rls.updateRateLimitedAccounts()
@@ -328,7 +328,7 @@ func TestShouldLimitAccount(t *testing.T) {
 		{
 			name: "should limit unlimited plan account over custom limit",
 			rateLimit: store.RateLimit{
-				PlanType:         grovedb.PlanUnlimited_Database,
+				PlanType:         grovedb.PlanUnlimited_DatabaseType,
 				MonthlyUserLimit: 500_000,
 			},
 			usage:          600_000,
@@ -337,7 +337,7 @@ func TestShouldLimitAccount(t *testing.T) {
 		{
 			name: "should not limit unlimited plan account under custom limit",
 			rateLimit: store.RateLimit{
-				PlanType:         grovedb.PlanUnlimited_Database,
+				PlanType:         grovedb.PlanUnlimited_DatabaseType,
 				MonthlyUserLimit: 500_000,
 			},
 			usage:          400_000,
@@ -346,7 +346,7 @@ func TestShouldLimitAccount(t *testing.T) {
 		{
 			name: "should not limit unlimited plan account with no custom limit",
 			rateLimit: store.RateLimit{
-				PlanType:         grovedb.PlanUnlimited_Database,
+				PlanType:         grovedb.PlanUnlimited_DatabaseType,
 				MonthlyUserLimit: 0,
 			},
 			usage:          1_000_000,
@@ -400,21 +400,21 @@ func TestRateLimitStoreIntegration(t *testing.T) {
 			Return(initialUsageData, nil)
 
 		mockAccountStore.EXPECT().
-			GetAccountRateLimits(store.AccountID("free_account_over")).
+			GetAccountRateLimit(store.AccountID("free_account_over")).
 			Return(store.RateLimit{
 				PlanType: grovedb.PlanFree_DatabaseType,
 			}, true)
 
 		mockAccountStore.EXPECT().
-			GetAccountRateLimits(store.AccountID("free_account_under")).
+			GetAccountRateLimit(store.AccountID("free_account_under")).
 			Return(store.RateLimit{
 				PlanType: grovedb.PlanFree_DatabaseType,
 			}, true)
 
 		mockAccountStore.EXPECT().
-			GetAccountRateLimits(store.AccountID("unlimited_account")).
+			GetAccountRateLimit(store.AccountID("unlimited_account")).
 			Return(store.RateLimit{
-				PlanType:         grovedb.PlanUnlimited_Database,
+				PlanType:         grovedb.PlanUnlimited_DatabaseType,
 				MonthlyUserLimit: 0, // No limit
 			}, true)
 
@@ -440,8 +440,8 @@ func TestRateLimitStoreConcurrency(t *testing.T) {
 		c := require.New(t)
 
 		rls := &rateLimitStore{
-			rateLimitedAccounts: map[store.AccountID]struct{}{
-				"test_account": {},
+			rateLimitedAccounts: map[store.AccountID]bool{
+				"test_account": true,
 			},
 		}
 
@@ -461,8 +461,8 @@ func TestRateLimitStoreConcurrency(t *testing.T) {
 		go func() {
 			for i := 0; i < 10; i++ {
 				rls.rateLimitedAccountsMu.Lock()
-				rls.rateLimitedAccounts = map[store.AccountID]struct{}{
-					"new_account": {},
+				rls.rateLimitedAccounts = map[store.AccountID]bool{
+					"new_account": true,
 				}
 				rls.rateLimitedAccountsMu.Unlock()
 				time.Sleep(1 * time.Millisecond)

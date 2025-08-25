@@ -17,7 +17,7 @@ const freeTierMonthlyUserLimit = 150_000
 
 // accountRateLimitStore interface provides an in-memory store of account rate limits.
 type accountRateLimitStore interface {
-	GetAccountRateLimits(accountID store.AccountID) (store.RateLimit, bool)
+	GetAccountRateLimit(accountID store.AccountID) (store.RateLimit, bool)
 }
 
 // dataWarehouseDriver interface provides a driver for fetching monthly usage data from the data warehouse.
@@ -32,7 +32,7 @@ type rateLimitStore struct {
 	dataWarehouseDriver   dataWarehouseDriver
 	accountRateLimitStore accountRateLimitStore
 
-	rateLimitedAccounts   map[store.AccountID]struct{}
+	rateLimitedAccounts   map[store.AccountID]bool
 	rateLimitedAccountsMu sync.RWMutex
 }
 
@@ -48,7 +48,7 @@ func NewRateLimitStore(
 		accountRateLimitStore: accountRateLimitStore,
 		dataWarehouseDriver:   dataWarehouseDriver,
 
-		rateLimitedAccounts: make(map[store.AccountID]struct{}),
+		rateLimitedAccounts: make(map[store.AccountID]bool),
 	}
 
 	// Run initial check immediately
@@ -68,9 +68,7 @@ func NewRateLimitStore(
 func (rls *rateLimitStore) IsAccountRateLimited(accountID store.AccountID) bool {
 	rls.rateLimitedAccountsMu.RLock()
 	defer rls.rateLimitedAccountsMu.RUnlock()
-
-	_, isLimited := rls.rateLimitedAccounts[accountID]
-	return isLimited
+	return rls.rateLimitedAccounts[accountID]
 }
 
 // startRateLimitMonitoring runs the periodic rate limit check in a background goroutine.
@@ -106,13 +104,13 @@ func (rls *rateLimitStore) updateRateLimitedAccounts() error {
 	}
 
 	// Build new rate limited accounts map
-	newRateLimitedAccounts := make(map[store.AccountID]struct{})
+	newRateLimitedAccounts := make(map[store.AccountID]bool)
 
 	for accountIDStr, usage := range usageData {
 		accountID := store.AccountID(accountIDStr)
 
 		// Get the account's rate limit configuration
-		rateLimit, exists := rls.accountRateLimitStore.GetAccountRateLimits(accountID)
+		rateLimit, exists := rls.accountRateLimitStore.GetAccountRateLimit(accountID)
 		if !exists {
 			// Skip accounts without rate limit configuration
 			continue
@@ -121,7 +119,7 @@ func (rls *rateLimitStore) updateRateLimitedAccounts() error {
 		// Check if account should be rate limited based on plan type
 		shouldLimit := rls.shouldLimitAccount(rateLimit, usage)
 		if shouldLimit {
-			newRateLimitedAccounts[accountID] = struct{}{}
+			newRateLimitedAccounts[accountID] = true
 			rls.logger.Debug().
 				Str("account_id", string(accountID)).
 				Str("plan_type", string(rateLimit.PlanType)).
@@ -153,7 +151,7 @@ func (rls *rateLimitStore) shouldLimitAccount(rateLimit store.RateLimit, usage i
 		// For free plan, check against the free tier limit
 		return usage > freeTierMonthlyUserLimit
 
-	case grovedb.PlanUnlimited_Database:
+	case grovedb.PlanUnlimited_DatabaseType:
 		// For unlimited plan, check against the account's specific monthly limit (if set)
 		if rateLimit.MonthlyUserLimit > 0 {
 			return usage > int64(rateLimit.MonthlyUserLimit)

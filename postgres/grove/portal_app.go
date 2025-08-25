@@ -6,8 +6,8 @@ import (
 )
 
 const (
-	PlanFree_DatabaseType  store.PlanType = "PLAN_FREE"
-	PlanUnlimited_Database store.PlanType = "PLAN_UNLIMITED"
+	PlanFree_DatabaseType      store.PlanType = "PLAN_FREE"
+	PlanUnlimited_DatabaseType store.PlanType = "PLAN_UNLIMITED"
 )
 
 // portalApplicationRow is a struct that represents a row from the portal_applications table

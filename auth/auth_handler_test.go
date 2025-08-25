@@ -333,7 +333,7 @@ func Test_Check(t *testing.T) {
 				AccountID: "account_unlimited",
 				Auth:      nil,
 				RateLimit: &store.RateLimit{
-					PlanType:         grovedb.PlanUnlimited_Database,
+					PlanType:         grovedb.PlanUnlimited_DatabaseType,
 					MonthlyUserLimit: 0, // No specific limit
 				},
 			},

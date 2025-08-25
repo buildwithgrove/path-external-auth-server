@@ -41,19 +41,19 @@ func (m *MockaccountRateLimitStore) EXPECT() *MockaccountRateLimitStoreMockRecor
 	return m.recorder
 }
 
-// GetAccountRateLimits mocks base method.
-func (m *MockaccountRateLimitStore) GetAccountRateLimits(accountID store.AccountID) (store.RateLimit, bool) {
+// GetAccountRateLimit mocks base method.
+func (m *MockaccountRateLimitStore) GetAccountRateLimit(accountID store.AccountID) (store.RateLimit, bool) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetAccountRateLimits", accountID)
+	ret := m.ctrl.Call(m, "GetAccountRateLimit", accountID)
 	ret0, _ := ret[0].(store.RateLimit)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }
 
-// GetAccountRateLimits indicates an expected call of GetAccountRateLimits.
-func (mr *MockaccountRateLimitStoreMockRecorder) GetAccountRateLimits(accountID any) *gomock.Call {
+// GetAccountRateLimit indicates an expected call of GetAccountRateLimit.
+func (mr *MockaccountRateLimitStoreMockRecorder) GetAccountRateLimit(accountID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAccountRateLimits", reflect.TypeOf((*MockaccountRateLimitStore)(nil).GetAccountRateLimits), accountID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAccountRateLimit", reflect.TypeOf((*MockaccountRateLimitStore)(nil).GetAccountRateLimit), accountID)
 }
 
 // MockdataWarehouseDriver is a mock of dataWarehouseDriver interface.
