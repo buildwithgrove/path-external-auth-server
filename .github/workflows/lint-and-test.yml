@@ -1,4 +1,4 @@
-name: External Auth Server lint and test
+name: PEAS Lint, Test & Docker Build
 
 on:
   push:
@@ -7,8 +7,8 @@ on:
     branches: [main]
 
 jobs:
-  linter:
-    name: Run golangci-lint
+  run-linter:
+    name: Run linter
     runs-on: "ubuntu-22.04"
     steps:
       - uses: actions/checkout@v4
@@ -17,34 +17,34 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.22.1"
+          go-version: "1.24"
 
       - name: Setup Git Authentication
         run: |
           git config --global url."https://${{ github.token }}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
 
-      - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v6
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8
         with:
-          version: latest
-          args: --timeout 10m --verbose
+          version: v2.1
+          args: --timeout 20m --verbose
 
-  unit-testing:
-    name: Run all unit tests
+  run-unit-tests:
+    name: Run unit tests
     runs-on: "ubuntu-22.04"
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.22.1"
+          go-version: "1.24"
 
       - name: Setup Git Authentication
         run: |
           git config --global url."https://${{ github.token }}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
 
-      - name: Run all unit tests
-        run: make test_verbose
+      - name: Run unit tests
+        run: make test_unit
 
   test-docker-build:
     name: Test build of Docker image
