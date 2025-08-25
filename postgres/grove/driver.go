@@ -101,7 +101,7 @@ func (d *GrovePostgresDriver) GetPortalApps() (map[store.PortalAppID]*store.Port
 		return nil, fmt.Errorf("failed to fetch portal applications: %w", err)
 	}
 
-	d.logger.Info().Int("num_rows", len(rows)).Msg("✅ Successfully fetched initial data from Postgres")
+	d.logger.Info().Int("num_rows", len(rows)).Msg("✅ Successfully fetched Portal Applications from Postgres")
 
 	return sqlcPortalAppsToPortalApps(rows), nil
 }

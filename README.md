@@ -16,6 +16,10 @@
   - [How It Works](#how-it-works)
   - [Configuration](#configuration)
 - [Envoy Gateway Integration](#envoy-gateway-integration)
+- [Getting Portal App Auth \& Rate Limit Status](#getting-portal-app-auth--rate-limit-status)
+  - [Prerequisites](#prerequisites)
+  - [Usage](#usage)
+  - [Example Output](#example-output)
 - [PEAS Environment Variables](#peas-environment-variables)
 
 ## Introduction
@@ -136,6 +140,87 @@ For more information see:
 
 - [Envoy Gateway External Authorization Docs](https://gateway.envoyproxy.io/docs/tasks/security/ext-auth/)
 - [Envoy Proxy `ext_authz` HTTP Filter Docs](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter)
+
+## Getting Portal App Auth & Rate Limit Status
+
+PEAS includes a convenient Makefile target for testing authorization and rate limit status for Portal Apps during development.
+
+### Prerequisites
+
+- PEAS server running on `localhost:10001`
+- `grpcurl` installed ([installation guide](https://github.com/fullstorydev/grpcurl#installation))
+- `jq` installed for JSON formatting ([installation guide](https://jqlang.github.io/jq/download/))
+
+### Usage
+
+```bash
+# Test without API key (for apps that don't require authentication)
+make get_portal_app_auth_status PORTAL_APP_ID=1a2b3c4d
+
+# Test with API key (for apps that require authentication)  
+make get_portal_app_auth_status PORTAL_APP_ID=1a2b3c4d API_KEY=4c352139ec5ca9288126300271d08867
+```
+
+### Example Output
+
+**Successful Authorization:**
+```json
+{
+  "status": {
+    "message": "ok"
+  },
+  "okResponse": {
+    "headers": [
+      {
+        "header": {
+          "key": "Portal-Application-ID",
+          "value": "1a2b3c4d"
+        }
+      },
+      {
+        "header": {
+          "key": "Portal-Account-ID", 
+          "value": "d4c3b2a1"
+        }
+      }
+    ]
+  }
+}
+```
+
+**Failed Authorization:**
+```json
+{
+  "status": {
+    "code": 7,
+    "message": "portal app not found"
+  },
+  "deniedResponse": {
+    "status": {
+      "code": "NotFound"
+    },
+    "body": "{\"code\": 404, \"message\": \"portal app not found\"}"
+  }
+}
+```
+
+**Failed Rate Limit Check:**
+```json
+{
+  "status": {
+    "code": 7,
+    "message": "account is rate limited"
+  },
+  "deniedResponse": {
+    "status": {
+      "code": "TooManyRequests"
+    },
+    "body": "{\"code\": 429, \"message\": \"account is rate limited\"}"
+  }
+}
+```
+
+This tool uses gRPC reflection to communicate with PEAS, testing the same authorization flow that Envoy Gateway uses in production.
 
 ## PEAS Environment Variables
 

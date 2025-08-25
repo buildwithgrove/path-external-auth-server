@@ -9,7 +9,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"time"
 
 	envoy_core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy_auth "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
@@ -38,11 +37,15 @@ const (
 // PortalAppStore interface provides an in-memory store of PortalApps.
 //
 // Used for:
-// - Fast lookups of authorization data for PATH when processing requests.
+//   - Fast lookups of authorization data for PATH when processing requests.
 type PortalAppStore interface {
 	GetPortalApp(portalAppID store.PortalAppID) (*store.PortalApp, bool)
 }
 
+// RateLimitStore interface provides an in-memory store of rate limited accounts.
+//
+// Used for:
+//   - Fast lookups of rate limited accounts for PATH when processing requests.
 type RateLimitStore interface {
 	IsAccountRateLimited(accountID store.AccountID) bool
 }
@@ -50,7 +53,7 @@ type RateLimitStore interface {
 // AuthHandler processes requests from Envoy.
 //
 // Primary responsibilities:
-// - Handles requests via the Check method (called for each request)
+//   - Handles requests via the Check method (called for each request)
 type AuthHandler struct {
 	Logger polylog.Logger
 
@@ -66,23 +69,16 @@ type AuthHandler struct {
 
 // Check implements the Envoy External Authorization gRPC service.
 // Steps performed:
-// - Extract portal app ID from the path
-// - Extract account user ID from headers
-// - Fetch PortalApp from the database
-// - Perform all configured authorization checks
-// - Return a response with HTTP headers set
+//   - Extract Portal Application ID from the path
+//   - Extract Account ID from headers
+//   - Fetch Portal Application from the database
+//   - Check if the Portal Application is authorized
+//   - Check if the Account is rate limited
+//   - Return an OK or Denied response with HTTP headers set
 func (a *AuthHandler) Check(
 	ctx context.Context,
 	checkReq *envoy_auth.CheckRequest,
 ) (*envoy_auth.CheckResponse, error) {
-	start := time.Now()
-	var portalAppID store.PortalAppID
-	defer func() {
-		if portalAppID != "" {
-			logAuthDuration(a.Logger, string(portalAppID), start)
-		}
-	}()
-
 	// Get the HTTP request
 	req := checkReq.GetAttributes().GetRequest().GetHttp()
 	if req == nil {
@@ -98,53 +94,44 @@ func (a *AuthHandler) Check(
 	// Get the request headers as a http.Header
 	headers := convertMapToHeader(req.GetHeaders())
 
-	// Extract the portal app ID from the request
+	// Extract the Portal Application ID from the request
 	// It may be extracted from the URL path or the headers
 	portalAppID, err := extractPortalAppID(headers, path)
 	if err != nil {
-		a.Logger.Info().Err(err).Msg("unable to extract portal app ID from request")
+		a.Logger.Debug().Err(err).Msg("🚫 unable to extract portal app ID from request")
 		return getDeniedCheckResponse(err.Error(), envoy_type.StatusCode_BadRequest), nil
 	}
-
 	logger := a.Logger.With("portal_app_id", portalAppID)
-	logger.Debug().Msg("handling check request")
 
-	// Fetch PortalApp from portal app store
+	// If we get here, we have a valid Portal Application ID.
+	logger.Debug().Msg("🔍 handling check request")
+
+	// Fetch Portal Application from Portal Application store
 	portalApp, ok := a.getPortalApp(portalAppID)
 	if !ok {
-		logger.Info().Msg("specified portal app not found: rejecting the request.")
+		logger.Debug().Msg("🚫 specified portal app not found: rejecting the request.")
 		return getDeniedCheckResponse("portal app not found", envoy_type.StatusCode_NotFound), nil
 	}
+	logger = logger.With("account_id", portalApp.AccountID)
 
-	// Perform all configured authorization checks
-	if err := a.authPortalApp(headers, portalApp); err != nil {
-		logger.Info().Err(err).Msg("request failed authorization: rejecting the request.")
+	// Check if the Portal Application is authorized
+	if err := a.checkPortalAppAuthorized(headers, portalApp); err != nil {
+		logger.Debug().Err(err).Msg("🚫 request failed authorization: rejecting the request.")
 		return getDeniedCheckResponse(err.Error(), envoy_type.StatusCode_Unauthorized), nil
 	}
 
-	// Check if the account is rate limited
-	if err := a.checkAccountRateLimit(portalApp); err != nil {
-		logger.Info().Msg("account is rate limited: rejecting the request.")
+	// Check if the Account is rate limited
+	if err := a.checkAccountRateLimited(portalApp); err != nil {
+		logger.Debug().Msg("🚫 account is rate limited: rejecting the request.")
 		return getDeniedCheckResponse("account is rate limited", envoy_type.StatusCode_TooManyRequests), nil
 	}
 
-	// Add portal app ID, account ID, and rate limiting values to the headers
+	// Add Portal Application ID and Account ID to the headers
 	// to be passed upstream along the filter chain to the rate limiter.
 	httpHeaders := a.getHTTPHeaders(portalApp)
 
 	// Return a valid response with the HTTP headers set
 	return getOKCheckResponse(httpHeaders), nil
-}
-
-// logAuthDuration logs the duration of the auth request in ms at debug level, and warns if over 100ms.
-func logAuthDuration(logger polylog.Logger, portalAppID string, start time.Time) {
-	elapsed := time.Since(start)
-	elapsedMs := float64(elapsed.Microseconds()) / 1000.0
-	logger = logger.With("portal_app_id", portalAppID)
-	logger.Debug().Float64("auth_request_duration_ms", elapsedMs).Msg("auth request processed")
-	if elapsed > 100*time.Millisecond {
-		logger.Warn().Float64("auth_request_duration_ms", elapsedMs).Msg("auth request took over 100ms")
-	}
 }
 
 // --------------------------------- Helpers ---------------------------------
@@ -160,25 +147,25 @@ func convertMapToHeader(headersMap map[string]string) http.Header {
 }
 
 // getPortalApp fetches the PortalApp from the portal app store.
-// - Returns the PortalApp and a bool indicating if it was found.
+//   - Returns the PortalApp and a bool indicating if it was found.
 func (a *AuthHandler) getPortalApp(portalAppID store.PortalAppID) (*store.PortalApp, bool) {
 	return a.PortalAppStore.GetPortalApp(portalAppID)
 }
 
-// authPortalApp performs all configured authorization checks on the request.
-// - Returns nil if no authorization is required (Auth is nil or APIKey is empty)
-// - Otherwise, performs API Key authorization
-func (a *AuthHandler) authPortalApp(headers http.Header, portalApp *store.PortalApp) error {
+// checkPortalAppAuthorized performs all configured authorization checks on the request.
+//   - Returns nil if no authorization is required (Auth is nil or APIKey is empty)
+//   - Otherwise, performs API Key authorization
+func (a *AuthHandler) checkPortalAppAuthorized(headers http.Header, portalApp *store.PortalApp) error {
 	if portalApp.Auth == nil || portalApp.Auth.APIKey == "" {
 		return nil
 	}
 	return a.APIKeyAuthorizer.authorizeRequest(headers, portalApp)
 }
 
-// checkRateLimit checks if the account is rate limited.
-// - Returns nil if the account is not eligible for rate limiting.
-// - Returns an error if the account is rate limited.
-func (a *AuthHandler) checkAccountRateLimit(portalApp *store.PortalApp) error {
+// checkAccountRateLimited checks if the account is rate limited.
+//   - Returns nil if the account is not eligible for rate limiting.
+//   - Returns an error if the account is rate limited.
+func (a *AuthHandler) checkAccountRateLimited(portalApp *store.PortalApp) error {
 	if portalApp.RateLimit == nil {
 		return nil
 	}
@@ -188,10 +175,9 @@ func (a *AuthHandler) checkAccountRateLimit(portalApp *store.PortalApp) error {
 	return nil
 }
 
-// getHTTPHeaders sets all HTTP headers required by the PATH services on the request being forwarded.
-// - Adds portal app ID header on all requests ("Portal-Application-ID: <id>")
-// - Adds account ID header on all requests ("Portal-Account-ID: <id>")
-// - Adds rate limit header if applicable
+// getHTTPHeaders sets all HTTP headers required by the PATH service on the request being forwarded.
+//   - Adds portal app ID header on all requests ("Portal-Application-ID: <id>")
+//   - Adds account ID header on all requests ("Portal-Account-ID: <id>")
 func (a *AuthHandler) getHTTPHeaders(portalApp *store.PortalApp) []*envoy_core.HeaderValueOption {
 	headers := []*envoy_core.HeaderValueOption{
 		{
@@ -212,7 +198,7 @@ func (a *AuthHandler) getHTTPHeaders(portalApp *store.PortalApp) []*envoy_core.H
 }
 
 // getDeniedCheckResponse returns a CheckResponse with denied status and error message.
-// - Sets PermissionDenied code and error message in response.
+//   - Sets PermissionDenied code and error message in response.
 func getDeniedCheckResponse(err string, httpCode envoy_type.StatusCode) *envoy_auth.CheckResponse {
 	return &envoy_auth.CheckResponse{
 		Status: &status.Status{
@@ -231,7 +217,7 @@ func getDeniedCheckResponse(err string, httpCode envoy_type.StatusCode) *envoy_a
 }
 
 // getOKCheckResponse returns a CheckResponse with OK status and provided headers.
-// - Sets OK code and attaches provided headers to response.
+//   - Sets OK code and attaches provided headers to response.
 func getOKCheckResponse(headers []*envoy_core.HeaderValueOption) *envoy_auth.CheckResponse {
 	return &envoy_auth.CheckResponse{
 		Status: &status.Status{

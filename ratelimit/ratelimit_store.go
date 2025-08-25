@@ -12,21 +12,21 @@ import (
 	"github.com/buildwithgrove/path-external-auth-server/store"
 )
 
-// TODO_IN_THIS_PR(@commoddity): Make this configurable
-const rateLimitUpdateInterval = 1 * time.Minute
-
-// TODO_IN_THIS_PR(@commoddity): Get this from the database
+// TODO_IMPROVE(@commoddity): Get this from the database
 const freeTierMonthlyUserLimit = 150_000
 
-// TODO_IN_THIS_PR(@commoddity): Add a method to the rate limit store to get the rate limit for an account.
 type accountRateLimitStore interface {
 	GetAccountRateLimits(accountID store.AccountID) (store.RateLimit, bool)
+}
+
+type dataWarehouseDriver interface {
+	GetMonthToMomentUsage(ctx context.Context, minRelayThreshold int64) (map[store.AccountID]int64, error)
 }
 
 type rateLimitStore struct {
 	logger polylog.Logger
 
-	dataWarehouseDriver   *dataWarehouseDriver
+	dataWarehouseDriver   dataWarehouseDriver
 	accountRateLimitStore accountRateLimitStore
 
 	rateLimitedAccounts   map[store.AccountID]struct{}
@@ -35,16 +35,10 @@ type rateLimitStore struct {
 
 func NewRateLimitStore(
 	logger polylog.Logger,
-	gcpProjectID string,
+	dataWarehouseDriver dataWarehouseDriver,
 	accountRateLimitStore accountRateLimitStore,
+	rateLimitUpdateInterval time.Duration,
 ) (*rateLimitStore, error) {
-	dataWarehouseDriver, err := newDriver(context.Background(), gcpProjectID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize dataWarehouseDriver: %w", err)
-	}
-
-	defer dataWarehouseDriver.close()
-
 	rls := &rateLimitStore{
 		logger: logger.With("component", "rate_limit_store"),
 
@@ -62,7 +56,7 @@ func NewRateLimitStore(
 	}
 
 	// Start the background rate limit monitoring
-	go rls.startRateLimitMonitoring()
+	go rls.startRateLimitMonitoring(rateLimitUpdateInterval)
 
 	return rls, nil
 }
@@ -80,7 +74,7 @@ func (rls *rateLimitStore) IsAccountRateLimited(accountID store.AccountID) bool 
 }
 
 // startRateLimitMonitoring runs the periodic rate limit check in a background goroutine.
-func (rls *rateLimitStore) startRateLimitMonitoring() {
+func (rls *rateLimitStore) startRateLimitMonitoring(rateLimitUpdateInterval time.Duration) {
 	rls.logger.Info().
 		Dur("update_interval", rateLimitUpdateInterval).
 		Msg("🚦 Starting rate limit monitoring")
@@ -103,7 +97,10 @@ func (rls *rateLimitStore) updateRateLimitedAccounts() error {
 	rls.logger.Debug().Msg("🔍 Checking account rate limits")
 
 	// Get month-to-date usage for accounts over the threshold
-	usageData, err := rls.dataWarehouseDriver.getMonthToMomentUsage(context.Background())
+	usageData, err := rls.dataWarehouseDriver.GetMonthToMomentUsage(
+		context.Background(),
+		freeTierMonthlyUserLimit,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to get monthly usage data: %w", err)
 	}
@@ -140,7 +137,7 @@ func (rls *rateLimitStore) updateRateLimitedAccounts() error {
 	rls.rateLimitedAccountsMu.Unlock()
 
 	updateDuration := time.Since(startTime)
-	rls.logger.Debug().
+	rls.logger.Info().
 		Int("total_accounts_checked", len(usageData)).
 		Int("rate_limited_accounts", len(newRateLimitedAccounts)).
 		Int64("update_duration_ms", updateDuration.Milliseconds()).
@@ -149,10 +146,6 @@ func (rls *rateLimitStore) updateRateLimitedAccounts() error {
 	return nil
 }
 
-// TODO_IN_THIS_PR(@commoddity): See if we can handle this either:
-//   - In the BigQuery aggregations to the monthly relays table
-//   - In the monthly usage query to filter out accounts that are not eligible for rate limiting
-//
 // shouldLimitAccount determines if an account should be rate limited based on its plan and usage.
 func (rls *rateLimitStore) shouldLimitAccount(rateLimit store.RateLimit, usage int64) bool {
 	switch rateLimit.PlanType {
