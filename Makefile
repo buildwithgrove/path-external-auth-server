@@ -27,6 +27,10 @@ test_verbose: ## Runs all tests with verbose output enabled
 test_unit: ## Runs unit tests only (excludes Postgres Docker integration tests)
 	go test ./... -short -count=1
 
+.PHONY: go_lint
+go_lint: ## Run all go linters
+	golangci-lint run --timeout 5m --build-tags test --fix
+
 ###############################
 ### Mock Generation Targets ###
 ###############################
