@@ -14,7 +14,7 @@ import (
 	"google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
 
-	"github.com/buildwithgrove/path-external-auth-server/ratelimit"
+	grovedb "github.com/buildwithgrove/path-external-auth-server/postgres/grove"
 	"github.com/buildwithgrove/path-external-auth-server/store"
 )
 
@@ -47,7 +47,6 @@ func Test_Check(t *testing.T) {
 						Headers: []*envoy_core.HeaderValueOption{
 							{Header: &envoy_core.HeaderValue{Key: reqHeaderPortalAppID, Value: "portal_app_free"}},
 							{Header: &envoy_core.HeaderValue{Key: reqHeaderAccountID, Value: "account_1"}},
-							{Header: &envoy_core.HeaderValue{Key: string(ratelimit.PlanFree_RequestHeader), Value: "account_1"}},
 						},
 					},
 				},
@@ -58,7 +57,7 @@ func Test_Check(t *testing.T) {
 				AccountID: "account_1",
 				Auth:      nil, // No auth required
 				RateLimit: &store.RateLimit{
-					PlanType: ratelimit.PlanFree_DatabaseType,
+					PlanType: grovedb.PlanFree_DatabaseType,
 				},
 			},
 		},
@@ -268,6 +267,77 @@ func Test_Check(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "should return denied check response if account is rate limited",
+			checkReq: &envoy_auth.CheckRequest{
+				Attributes: &envoy_auth.AttributeContext{
+					Request: &envoy_auth.AttributeContext_Request{
+						Http: &envoy_auth.AttributeContext_HttpRequest{
+							Path: "/v1/portal_app_rate_limited",
+						},
+					},
+				},
+			},
+			expectedResp: &envoy_auth.CheckResponse{
+				Status: &status.Status{
+					Code:    int32(codes.PermissionDenied),
+					Message: "account is rate limited",
+				},
+				HttpResponse: &envoy_auth.CheckResponse_DeniedResponse{
+					DeniedResponse: &envoy_auth.DeniedHttpResponse{
+						Status: &envoy_type.HttpStatus{
+							Code: envoy_type.StatusCode_TooManyRequests,
+						},
+						Body: `{"code": 429, "message": "account is rate limited"}`,
+					},
+				},
+			},
+			portalAppID: "portal_app_rate_limited",
+			mockPortalAppReturn: &store.PortalApp{
+				ID:        "portal_app_rate_limited",
+				AccountID: "account_rate_limited",
+				Auth:      nil,
+				RateLimit: &store.RateLimit{
+					PlanType: grovedb.PlanFree_DatabaseType,
+				},
+			},
+		},
+		{
+			name: "should return OK check response for unlimited plan with no specific limit",
+			checkReq: &envoy_auth.CheckRequest{
+				Attributes: &envoy_auth.AttributeContext{
+					Request: &envoy_auth.AttributeContext_Request{
+						Http: &envoy_auth.AttributeContext_HttpRequest{
+							Path: "/v1/portal_app_unlimited_no_limit",
+						},
+					},
+				},
+			},
+			expectedResp: &envoy_auth.CheckResponse{
+				Status: &status.Status{
+					Code:    int32(codes.OK),
+					Message: "ok",
+				},
+				HttpResponse: &envoy_auth.CheckResponse_OkResponse{
+					OkResponse: &envoy_auth.OkHttpResponse{
+						Headers: []*envoy_core.HeaderValueOption{
+							{Header: &envoy_core.HeaderValue{Key: reqHeaderPortalAppID, Value: "portal_app_unlimited_no_limit"}},
+							{Header: &envoy_core.HeaderValue{Key: reqHeaderAccountID, Value: "account_unlimited"}},
+						},
+					},
+				},
+			},
+			portalAppID: "portal_app_unlimited_no_limit",
+			mockPortalAppReturn: &store.PortalApp{
+				ID:        "portal_app_unlimited_no_limit",
+				AccountID: "account_unlimited",
+				Auth:      nil,
+				RateLimit: &store.RateLimit{
+					PlanType:         grovedb.PlanUnlimited_Database,
+					MonthlyUserLimit: 0, // No specific limit
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -277,15 +347,27 @@ func Test_Check(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			mockStore := NewMockPortalAppStore(ctrl)
+			mockPortalAppStore := NewMockportalAppStore(ctrl)
+			mockRateLimitStore := NewMockrateLimitStore(ctrl)
 			if test.portalAppID != "" {
-				mockStore.EXPECT().GetPortalApp(test.portalAppID).Return(test.mockPortalAppReturn, test.mockPortalAppReturn != nil)
+				mockPortalAppStore.EXPECT().GetPortalApp(test.portalAppID).Return(test.mockPortalAppReturn, test.mockPortalAppReturn != nil)
+			}
+
+			// Set up rate limit store expectations
+			if test.mockPortalAppReturn != nil && test.mockPortalAppReturn.RateLimit != nil {
+				// Determine if account should be rate limited based on test case
+				isRateLimited := false
+				if test.name == "should return denied check response if account is rate limited" {
+					isRateLimited = true
+				}
+				mockRateLimitStore.EXPECT().IsAccountRateLimited(test.mockPortalAppReturn.AccountID).Return(isRateLimited)
 			}
 
 			authHandler := &AuthHandler{
 				Logger: polyzero.NewLogger(),
 
-				PortalAppStore:   mockStore,
+				PortalAppStore:   mockPortalAppStore,
+				RateLimitStore:   mockRateLimitStore,
 				APIKeyAuthorizer: &AuthorizerAPIKey{},
 			}
 

@@ -33,6 +33,8 @@ test_unit: ## Runs unit tests only (excludes Postgres Docker integration tests)
 
 .PHONY: gen_mocks
 gen_mocks: ## Generates the mocks for the project
+	mockgen -source=./auth/auth_handler.go -destination=./auth/auth_handler_mock_test.go -package=auth
+	mockgen -source=./ratelimit/ratelimit_store.go -destination=./ratelimit/ratelimit_store_mock_test.go -package=ratelimit
 	mockgen -source=./store/data_source.go -destination=./store/data_source_mock_test.go -package=store
 
 #############################
@@ -51,14 +53,19 @@ grove_gen_sqlc: ## Generates the SQLC code for Grove's portal schema
 peas_run: load_env peas_build ## Run the PEAS binary as a standalone binary
 	@echo "🚀 Starting PEAS server..."
 	@if [ -f .env ]; then \
-		export $$(grep -v '^#' .env | xargs) && (cd bin; ./peas); \
+		export $$(grep -v '^#' .env | xargs) && (cd bin; ./peas) || true; \
 	else \
-		(cd bin; ./peas); \
+		(cd bin; ./peas) || true; \
 	fi
 
 .PHONY: peas_build
 peas_build: ## Build the PEAS binary locally (does not run anything)
 	go build -o bin/peas .
+
+.PHONY: peas_logs
+peas_logs: ## Run PEAS and format JSON logs with jq (press Ctrl+C to stop)
+	@echo "🚀 Starting PEAS with formatted logs (Ctrl+C to stop)..."
+	@make peas_run | grep "^{" | jq -R 'fromjson' || true
 
 .PHONY: load_env
 load_env: ## Load and validate environment variables from .env file

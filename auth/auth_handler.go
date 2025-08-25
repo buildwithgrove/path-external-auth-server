@@ -34,19 +34,19 @@ const (
 	errBody = `{"code": %d, "message": "%s"}`
 )
 
-// PortalAppStore interface provides an in-memory store of PortalApps.
+// portalAppStore interface provides an in-memory store of PortalApps.
 //
 // Used for:
 //   - Fast lookups of authorization data for PATH when processing requests.
-type PortalAppStore interface {
+type portalAppStore interface {
 	GetPortalApp(portalAppID store.PortalAppID) (*store.PortalApp, bool)
 }
 
-// RateLimitStore interface provides an in-memory store of rate limited accounts.
+// rateLimitStore interface provides an in-memory store of rate limited accounts.
 //
 // Used for:
 //   - Fast lookups of rate limited accounts for PATH when processing requests.
-type RateLimitStore interface {
+type rateLimitStore interface {
 	IsAccountRateLimited(accountID store.AccountID) bool
 }
 
@@ -58,10 +58,10 @@ type AuthHandler struct {
 	Logger polylog.Logger
 
 	// PortalAppStore: in-memory store of PortalApps
-	PortalAppStore PortalAppStore
+	PortalAppStore portalAppStore
 
-	// RateLimitStore: used for checking if an account is rate limited
-	RateLimitStore RateLimitStore
+	// RateLimitStore: in-memory store of rate limited accounts
+	RateLimitStore rateLimitStore
 
 	// APIKeyAuthorizer: used for request authorization
 	APIKeyAuthorizer Authorizer

@@ -20,7 +20,7 @@ type accountRateLimitStore interface {
 }
 
 type dataWarehouseDriver interface {
-	GetMonthToMomentUsage(ctx context.Context, minRelayThreshold int64) (map[store.AccountID]int64, error)
+	GetMonthToMomentUsage(ctx context.Context, minRelayThreshold int64) (map[string]int64, error)
 }
 
 type rateLimitStore struct {

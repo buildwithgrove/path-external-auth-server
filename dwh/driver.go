@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"cloud.google.com/go/bigquery"
-	"github.com/buildwithgrove/path-external-auth-server/store"
 	"google.golang.org/api/iterator"
 )
 
@@ -56,7 +55,7 @@ func (d *Driver) Close() {
 func (d *Driver) GetMonthToMomentUsage(
 	ctx context.Context,
 	minRelayThreshold int64,
-) (map[store.AccountID]int64, error) {
+) (map[string]int64, error) {
 	// Execute query with project ID and threshold
 	query := getMonthlyUsageQuery(d.projectID, minRelayThreshold)
 	it, err := d.clientBQ.Query(query).Read(ctx)
@@ -65,7 +64,7 @@ func (d *Driver) GetMonthToMomentUsage(
 	}
 
 	// Process results
-	results := make(map[store.AccountID]int64)
+	results := make(map[string]int64)
 	for {
 		var row monthlyUsageRow
 		err := it.Next(&row)
@@ -76,7 +75,7 @@ func (d *Driver) GetMonthToMomentUsage(
 			return nil, fmt.Errorf("failed to read query result: %w", err)
 		}
 
-		results[store.AccountID(row.AccountID)] = row.TotalRelays
+		results[row.AccountID] = row.TotalRelays
 	}
 
 	return results, nil
