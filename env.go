@@ -38,10 +38,10 @@ const (
 	defaultPortalAppStoreRefreshInterval = 30 * time.Second
 
 	// [OPTIONAL]: Refresh interval for the rate limit store.
-	//   - Default: 60s if not set
+	//   - Default: 5m if not set
 	//   - Examples: "30s", "1m", "2m30s"
 	rateLimitStoreRefreshIntervalEnv     = "RATE_LIMIT_STORE_REFRESH_INTERVAL"
-	defaultRateLimitStoreRefreshInterval = 60 * time.Second
+	defaultRateLimitStoreRefreshInterval = 5 * time.Minute
 )
 
 var postgresConnectionStringRegex = regexp.MustCompile(`^postgres(?:ql)?:\/\/[^:]+:[^@]+@[^:]+:\d+\/[^?]+(?:\?.+)?$`)
