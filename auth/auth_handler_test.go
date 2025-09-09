@@ -363,13 +363,12 @@ func Test_Check(t *testing.T) {
 				mockRateLimitStore.EXPECT().IsAccountRateLimited(test.mockPortalAppReturn.AccountID).Return(isRateLimited)
 			}
 
-			authHandler := &AuthHandler{
-				Logger: polyzero.NewLogger(),
-
-				PortalAppStore:   mockPortalAppStore,
-				RateLimitStore:   mockRateLimitStore,
-				APIKeyAuthorizer: &AuthorizerAPIKey{},
-			}
+			authHandler := NewAuthHandler(
+				polyzero.NewLogger(),
+				mockPortalAppStore,
+				mockRateLimitStore,
+				&AuthorizerAPIKey{},
+			)
 
 			resp, err := authHandler.Check(context.Background(), test.checkReq)
 			c.NoError(err)

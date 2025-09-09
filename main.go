@@ -82,12 +82,12 @@ func main() {
 	}
 
 	// Create a new AuthHandler to handle the request auth
-	authHandler := &auth.AuthHandler{
-		Logger:           logger,
-		PortalAppStore:   portalAppStore,
-		RateLimitStore:   rateLimitStore,
-		APIKeyAuthorizer: &auth.AuthorizerAPIKey{},
-	}
+	authHandler := auth.NewAuthHandler(
+		logger,
+		portalAppStore,
+		rateLimitStore,
+		&auth.AuthorizerAPIKey{},
+	)
 
 	// Create a new gRPC server for handling auth requests from GUARD
 	// using Envoy Proxy's `ext_authz` HTTP Filter.
