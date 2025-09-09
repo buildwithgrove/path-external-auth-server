@@ -2,7 +2,7 @@ name: Tag and release new version and push to GHCR
 
 on:
   workflow_run:
-    workflows: ["External Auth Server lint and test"]
+    workflows: ["PEAS Lint, Test & Docker Build"]
     types:
       - completed
     branches:

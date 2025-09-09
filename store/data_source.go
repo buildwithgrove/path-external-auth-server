@@ -1,5 +1,8 @@
 package store
 
+// TODO_IMPROVE(@commoddity): Add an implementation of the data warehouse driver
+// to get portal app data from a YAML file instead of a Postgres database.
+
 // DataSource defines the interface for a data source that provides portal apps.
 //
 // Satisfied by grove.GrovePostgresDriver

@@ -23,8 +23,14 @@ type portalAppStore struct {
 	// In-memory map of portal apps (portalAppID -> *PortalApp)
 	portalApps map[PortalAppID]*PortalApp
 
+	// In-memory map of account rate limits (accountID -> RateLimit)
+	accountRateLimits map[AccountID]RateLimit
+
 	// Mutex to protect access to portalApps
 	portalAppsMu sync.RWMutex
+
+	// Mutex to protect access to accountRateLimits
+	accountRateLimitsMu sync.RWMutex
 }
 
 // NewPortalAppStore creates a new in-memory portal app store.
@@ -39,10 +45,10 @@ func NewPortalAppStore(
 	refreshInterval time.Duration,
 ) (*portalAppStore, error) {
 	store := &portalAppStore{
-		logger:       logger.With("component", "portal_app_data_store"),
-		dataSource:   dataSource,
-		portalApps:   make(map[PortalAppID]*PortalApp),
-		portalAppsMu: sync.RWMutex{},
+		logger:            logger.With("component", "portal_app_data_store"),
+		dataSource:        dataSource,
+		portalApps:        make(map[PortalAppID]*PortalApp),
+		accountRateLimits: make(map[AccountID]RateLimit),
 	}
 
 	// Fetch initial data from the data source and populate the store
@@ -70,21 +76,29 @@ func (c *portalAppStore) GetPortalApp(portalAppID PortalAppID) (*PortalApp, bool
 	return portalApp, ok
 }
 
+// GetAccountRateLimit retrieves a RateLimit from the store by its account ID.
+//
+// Returns:
+// - The RateLimit pointer if found
+// - A bool indicating if the RateLimit exists in the store
+func (c *portalAppStore) GetAccountRateLimit(accountID AccountID) (RateLimit, bool) {
+	c.accountRateLimitsMu.RLock()
+	defer c.accountRateLimitsMu.RUnlock()
+
+	rateLimit, ok := c.accountRateLimits[accountID]
+	return rateLimit, ok
+}
+
 // initializeStore fetches the initial set of PortalApps from the data source and populates the in-memory store.
 func (c *portalAppStore) initializeStore() error {
 	c.logger.Info().Msg("Fetching initial data from data source ...")
 
-	portalApps, err := c.dataSource.GetPortalApps()
+	err := c.setStoreData()
 	if err != nil {
-		return fmt.Errorf("failed to get initial data from data source: %w", err)
+		return fmt.Errorf("failed to set initial store data: %w", err)
 	}
 
 	c.logger.Info().Msg("🌱 Successfully fetched initial data from data source")
-
-	c.portalAppsMu.Lock()
-	defer c.portalAppsMu.Unlock()
-	c.portalApps = portalApps
-
 	return nil
 }
 
@@ -111,20 +125,52 @@ func (c *portalAppStore) refreshStore() error {
 	startTime := time.Now()
 	c.logger.Debug().Msg("💡 Refreshing portal apps from data source")
 
+	err := c.setStoreData()
+	if err != nil {
+		return fmt.Errorf("failed to refresh store data: %w", err)
+	}
+
+	refreshDuration := time.Since(startTime)
+	c.logger.Debug().
+		Int("portal_app_count", len(c.portalApps)).
+		Int64("refresh_duration_ms", refreshDuration.Milliseconds()).
+		Msg("🌿 Successfully refreshed portal apps from data source")
+
+	return nil
+}
+
+// setStoreData fetches portal apps from the data source and updates both portal apps and account rate limits.
+// This method is used by both initializeStore and refreshStore to avoid code duplication.
+func (c *portalAppStore) setStoreData() error {
 	portalApps, err := c.dataSource.GetPortalApps()
 	if err != nil {
 		return fmt.Errorf("failed to get portal apps from data source: %w", err)
 	}
 
 	c.portalAppsMu.Lock()
-	defer c.portalAppsMu.Unlock()
 	c.portalApps = portalApps
+	c.portalAppsMu.Unlock()
 
-	refreshDuration := time.Since(startTime)
-	c.logger.Debug().
-		Int("portal_app_count", len(portalApps)).
-		Int64("refresh_duration_ms", refreshDuration.Milliseconds()).
-		Msg("🌿 Successfully refreshed portal apps from data source")
+	c.setAccountRateLimits(portalApps)
 
 	return nil
+}
+
+// setAccountRateLimits extracts and caches account rate limits from portal apps.
+// Only sets account data if it's not already set for the same account ID to avoid unnecessary updates.
+func (c *portalAppStore) setAccountRateLimits(portalApps map[PortalAppID]*PortalApp) {
+	c.accountRateLimitsMu.Lock()
+	defer c.accountRateLimitsMu.Unlock()
+
+	for _, portalApp := range portalApps {
+		// Skip if portal app has no rate limit configured
+		if portalApp.RateLimit == nil {
+			continue
+		}
+
+		// Only set if not already present for this account ID
+		if _, exists := c.accountRateLimits[portalApp.AccountID]; !exists {
+			c.accountRateLimits[portalApp.AccountID] = *portalApp.RateLimit
+		}
+	}
 }
