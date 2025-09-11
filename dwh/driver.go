@@ -31,7 +31,6 @@ type monthlyUsageRow struct {
 // Otherwise, it falls back to default credentials (ADC).
 func NewDriver(ctx context.Context, projectID string, credsFile string) (*Driver, error) {
 	clientBQ, err := bigquery.NewClient(ctx, projectID, option.WithCredentialsFile(credsFile))
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to bigQuery: %w", err)
 	}
