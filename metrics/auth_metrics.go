@@ -57,7 +57,7 @@ var (
 	)
 
 	// authRequestDurationSeconds measures authorization request processing duration.
-	// Histogram buckets from 1ms to 100ms capture performance from fast in-memory lookups to slower operations.
+	// Histogram buckets from 100ns to 10ms capture performance from fast in-memory lookups to slower operations.
 	//
 	// Usage:
 	// - Monitor authorization latency SLAs
@@ -68,8 +68,8 @@ var (
 			Subsystem: peasProcess,
 			Name:      authRequestDurationSecondsMetricName,
 			Help:      "Histogram of authorization request processing time in seconds",
-			// Buckets optimized for fast in-memory operations (1ms to 100ms)
-			Buckets: []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1},
+			// Buckets optimized for very fast in-memory operations (100ns to 10ms)
+			Buckets: []float64{0.0000001, 0.0000005, 0.000001, 0.000005, 0.00001, 0.00005, 0.0001, 0.0005, 0.001, 0.005, 0.01},
 		},
 		[]string{"portal_app_id", "status"},
 	)
@@ -151,7 +151,13 @@ var (
 )
 
 // RecordAuthRequest records an authorization request with all relevant labels.
-func RecordAuthRequest(portalAppID, accountID, status, errorType string, duration float64) {
+func RecordAuthRequest(
+	portalAppID string,
+	accountID string,
+	status string,
+	errorType string,
+	duration float64,
+) {
 	authRequestsTotal.With(prometheus.Labels{
 		"portal_app_id": portalAppID,
 		"account_id":    accountID,
@@ -166,7 +172,11 @@ func RecordAuthRequest(portalAppID, accountID, status, errorType string, duratio
 }
 
 // RecordRateLimitCheck records a rate limit check decision.
-func RecordRateLimitCheck(accountID, planType, decision string) {
+func RecordRateLimitCheck(
+	accountID string,
+	planType string,
+	decision string,
+) {
 	rateLimitChecksTotal.With(prometheus.Labels{
 		"account_id": accountID,
 		"plan_type":  planType,
@@ -175,14 +185,21 @@ func RecordRateLimitCheck(accountID, planType, decision string) {
 }
 
 // UpdateStoreSize updates the current size of a store.
-func UpdateStoreSize(storeType string, size float64) {
+func UpdateStoreSize(
+	storeType string,
+	size float64,
+) {
 	storeSizeTotal.With(prometheus.Labels{
 		"store_type": storeType,
 	}).Set(size)
 }
 
 // UpdateAccountUsage updates the usage for an account that is over their monthly limit.
-func UpdateAccountUsage(accountID, planType string, usage float64) {
+func UpdateAccountUsage(
+	accountID string,
+	planType string,
+	usage float64,
+) {
 	accountUsageTotal.With(prometheus.Labels{
 		"account_id": accountID,
 		"plan_type":  planType,
@@ -190,7 +207,10 @@ func UpdateAccountUsage(accountID, planType string, usage float64) {
 }
 
 // RecordDataSourceRefreshError records an error during data source refresh.
-func RecordDataSourceRefreshError(sourceType, errorType string) {
+func RecordDataSourceRefreshError(
+	sourceType string,
+	errorType string,
+) {
 	dataSourceRefreshErrorsTotal.With(prometheus.Labels{
 		"source_type": sourceType,
 		"error_type":  errorType,
