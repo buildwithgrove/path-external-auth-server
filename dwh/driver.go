@@ -6,6 +6,7 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
 )
 
 // Driver handles BigQuery operations for data warehouse queries
@@ -24,9 +25,13 @@ type monthlyUsageRow struct {
 // Constructor and Cleanup
 // ===========================================================================================
 
-// NewDriver creates a new BigQuery Driver instance
-func NewDriver(ctx context.Context, projectID string) (*Driver, error) {
-	clientBQ, err := bigquery.NewClient(ctx, projectID)
+// NewDriver creates a new BigQuery Driver instance.
+// If GOOGLE_APPLICATION_CREDENTIALS_FILE environment variable is set,
+// it will use that JSON credentials file for authentication.
+// Otherwise, it falls back to default credentials (ADC).
+func NewDriver(ctx context.Context, projectID string, credsFile string) (*Driver, error) {
+	clientBQ, err := bigquery.NewClient(ctx, projectID, option.WithCredentialsFile(credsFile))
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to bigQuery: %w", err)
 	}

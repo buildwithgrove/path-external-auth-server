@@ -21,6 +21,10 @@ const (
 	//   - Example: "your-project-id"
 	gcpProjectIDEnv = "GCP_PROJECT_ID"
 
+	// [REQUIRED]: Path to the JSON credentials file for the data warehouse used by the rate limit store.
+	//   - Example: "/path/to/credentials.json"
+	gcpCredentialsFileEnv = "GOOGLE_APPLICATION_CREDENTIALS_FILE"
+
 	// [OPTIONAL]: Port to run the external auth server on.
 	//   - Default: 10001 if not set
 	portEnv     = "PORT"
@@ -52,6 +56,7 @@ var postgresConnectionStringRegex = regexp.MustCompile(`^postgres(?:ql)?:\/\/[^:
 type envVars struct {
 	postgresConnectionString      string
 	gcpProjectID                  string
+	gcpCredentialsFile            string
 	port                          int
 	loggerLevel                   string
 	portalAppStoreRefreshInterval time.Duration
@@ -66,6 +71,7 @@ func gatherEnvVars() (envVars, error) {
 	e := envVars{
 		postgresConnectionString: os.Getenv(postgresConnectionStringEnv),
 		gcpProjectID:             os.Getenv(gcpProjectIDEnv),
+		gcpCredentialsFile:       os.Getenv(gcpCredentialsFileEnv),
 	}
 
 	// Parse port environment variable (if provided)
@@ -124,6 +130,11 @@ func (e *envVars) validate() error {
 	// GCP project ID must be set
 	if e.gcpProjectID == "" {
 		return fmt.Errorf("%s is not set", gcpProjectIDEnv)
+	}
+
+	// GCP credentials file must be set
+	if e.gcpCredentialsFile == "" {
+		return fmt.Errorf("%s is not set", gcpCredentialsFileEnv)
 	}
 
 	// Connection string must match expected format

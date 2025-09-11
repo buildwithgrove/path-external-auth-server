@@ -45,7 +45,11 @@ func main() {
 	logger.Info().Msg("🐘 Successfully connected to postgres as a data source")
 
 	// Create a new data warehouse driver
-	dataWarehouseDriver, err := dwh.NewDriver(context.Background(), env.gcpProjectID)
+	dataWarehouseDriver, err := dwh.NewDriver(
+		context.Background(),
+		env.gcpProjectID,
+		env.gcpCredentialsFile,
+	)
 	if err != nil {
 		panic(err)
 	}
