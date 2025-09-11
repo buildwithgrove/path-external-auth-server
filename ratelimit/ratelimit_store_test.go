@@ -25,7 +25,7 @@ func TestNewRateLimitStore(t *testing.T) {
 			name: "should create rate limit store successfully with successful initial update",
 			setupMocks: func(mockDWH *MockdataWarehouseDriver, mockAccountStore *MockaccountRateLimitStore) {
 				mockDWH.EXPECT().
-					GetMonthToMomentUsage(gomock.Any(), int64(freeTierMonthlyUserLimit)).
+					GetMonthToMomentUsage(gomock.Any(), int64(FreeMonthlyRelays)).
 					Return(map[string]int64{}, nil)
 			},
 			expectError:             false,
@@ -36,7 +36,7 @@ func TestNewRateLimitStore(t *testing.T) {
 			name: "should create rate limit store successfully even with failed initial update",
 			setupMocks: func(mockDWH *MockdataWarehouseDriver, mockAccountStore *MockaccountRateLimitStore) {
 				mockDWH.EXPECT().
-					GetMonthToMomentUsage(gomock.Any(), int64(freeTierMonthlyUserLimit)).
+					GetMonthToMomentUsage(gomock.Any(), int64(FreeMonthlyRelays)).
 					Return(nil, errors.New("dwh connection failed"))
 			},
 			expectError:             false,
@@ -135,10 +135,10 @@ func TestUpdateRateLimitedAccounts(t *testing.T) {
 			name: "should update rate limited accounts with free plan account over limit",
 			setupMocks: func(mockDWH *MockdataWarehouseDriver, mockAccountStore *MockaccountRateLimitStore) {
 				usageData := map[string]int64{
-					"free_account_over_limit": freeTierMonthlyUserLimit + 1000,
+					"free_account_over_limit": FreeMonthlyRelays + 1000,
 				}
 				mockDWH.EXPECT().
-					GetMonthToMomentUsage(gomock.Any(), int64(freeTierMonthlyUserLimit)).
+					GetMonthToMomentUsage(gomock.Any(), int64(FreeMonthlyRelays)).
 					Return(usageData, nil)
 
 				mockAccountStore.EXPECT().
@@ -155,10 +155,10 @@ func TestUpdateRateLimitedAccounts(t *testing.T) {
 			name: "should not rate limit free plan account under limit",
 			setupMocks: func(mockDWH *MockdataWarehouseDriver, mockAccountStore *MockaccountRateLimitStore) {
 				usageData := map[string]int64{
-					"free_account_under_limit": freeTierMonthlyUserLimit - 1000,
+					"free_account_under_limit": FreeMonthlyRelays - 1000,
 				}
 				mockDWH.EXPECT().
-					GetMonthToMomentUsage(gomock.Any(), int64(freeTierMonthlyUserLimit)).
+					GetMonthToMomentUsage(gomock.Any(), int64(FreeMonthlyRelays)).
 					Return(usageData, nil)
 
 				mockAccountStore.EXPECT().
@@ -178,7 +178,7 @@ func TestUpdateRateLimitedAccounts(t *testing.T) {
 					"unlimited_account_over_custom_limit": 500_000,
 				}
 				mockDWH.EXPECT().
-					GetMonthToMomentUsage(gomock.Any(), int64(freeTierMonthlyUserLimit)).
+					GetMonthToMomentUsage(gomock.Any(), int64(FreeMonthlyRelays)).
 					Return(usageData, nil)
 
 				mockAccountStore.EXPECT().
@@ -195,10 +195,10 @@ func TestUpdateRateLimitedAccounts(t *testing.T) {
 			name: "should not rate limit unlimited plan account with no limit set",
 			setupMocks: func(mockDWH *MockdataWarehouseDriver, mockAccountStore *MockaccountRateLimitStore) {
 				usageData := map[string]int64{
-					"unlimited_account_no_limit": 1_000_000,
+					"unlimited_account_no_limit": FreeMonthlyRelays,
 				}
 				mockDWH.EXPECT().
-					GetMonthToMomentUsage(gomock.Any(), int64(freeTierMonthlyUserLimit)).
+					GetMonthToMomentUsage(gomock.Any(), int64(FreeMonthlyRelays)).
 					Return(usageData, nil)
 
 				mockAccountStore.EXPECT().
@@ -218,7 +218,7 @@ func TestUpdateRateLimitedAccounts(t *testing.T) {
 					"account_without_config": 500_000,
 				}
 				mockDWH.EXPECT().
-					GetMonthToMomentUsage(gomock.Any(), int64(freeTierMonthlyUserLimit)).
+					GetMonthToMomentUsage(gomock.Any(), int64(FreeMonthlyRelays)).
 					Return(usageData, nil)
 
 				mockAccountStore.EXPECT().
@@ -235,7 +235,7 @@ func TestUpdateRateLimitedAccounts(t *testing.T) {
 					"account_unknown_plan": 500_000,
 				}
 				mockDWH.EXPECT().
-					GetMonthToMomentUsage(gomock.Any(), int64(freeTierMonthlyUserLimit)).
+					GetMonthToMomentUsage(gomock.Any(), int64(FreeMonthlyRelays)).
 					Return(usageData, nil)
 
 				mockAccountStore.EXPECT().
@@ -252,7 +252,7 @@ func TestUpdateRateLimitedAccounts(t *testing.T) {
 			name: "should return error when data warehouse fails",
 			setupMocks: func(mockDWH *MockdataWarehouseDriver, mockAccountStore *MockaccountRateLimitStore) {
 				mockDWH.EXPECT().
-					GetMonthToMomentUsage(gomock.Any(), int64(freeTierMonthlyUserLimit)).
+					GetMonthToMomentUsage(gomock.Any(), int64(FreeMonthlyRelays)).
 					Return(nil, errors.New("data warehouse connection failed"))
 			},
 			expectedRateLimitedCount: 0,
@@ -304,7 +304,7 @@ func TestShouldLimitAccount(t *testing.T) {
 				PlanType:         grovedb.PlanFree_DatabaseType,
 				MonthlyUserLimit: 0,
 			},
-			usage:          freeTierMonthlyUserLimit + 1000,
+			usage:          FreeMonthlyRelays + 1000,
 			expectedResult: true,
 		},
 		{
@@ -313,7 +313,7 @@ func TestShouldLimitAccount(t *testing.T) {
 				PlanType:         grovedb.PlanFree_DatabaseType,
 				MonthlyUserLimit: 0,
 			},
-			usage:          freeTierMonthlyUserLimit - 1000,
+			usage:          FreeMonthlyRelays - 1000,
 			expectedResult: false,
 		},
 		{
@@ -322,7 +322,7 @@ func TestShouldLimitAccount(t *testing.T) {
 				PlanType:         grovedb.PlanFree_DatabaseType,
 				MonthlyUserLimit: 0,
 			},
-			usage:          freeTierMonthlyUserLimit,
+			usage:          FreeMonthlyRelays,
 			expectedResult: false, // > comparison, so exactly at limit is not limited
 		},
 		{
@@ -349,7 +349,7 @@ func TestShouldLimitAccount(t *testing.T) {
 				PlanType:         grovedb.PlanUnlimited_DatabaseType,
 				MonthlyUserLimit: 0,
 			},
-			usage:          1_000_000,
+			usage:          FreeMonthlyRelays,
 			expectedResult: false,
 		},
 		{
@@ -389,14 +389,14 @@ func TestRateLimitStoreIntegration(t *testing.T) {
 
 		// Setup initial data - one account over limit, one under
 		initialUsageData := map[string]int64{
-			"free_account_over":  freeTierMonthlyUserLimit + 5000,
-			"free_account_under": freeTierMonthlyUserLimit - 5000,
+			"free_account_over":  FreeMonthlyRelays + 5000,
+			"free_account_under": FreeMonthlyRelays - 5000,
 			"unlimited_account":  500_000,
 		}
 
 		// First call during NewRateLimitStore
 		mockDWH.EXPECT().
-			GetMonthToMomentUsage(gomock.Any(), int64(freeTierMonthlyUserLimit)).
+			GetMonthToMomentUsage(gomock.Any(), int64(FreeMonthlyRelays)).
 			Return(initialUsageData, nil)
 
 		mockAccountStore.EXPECT().

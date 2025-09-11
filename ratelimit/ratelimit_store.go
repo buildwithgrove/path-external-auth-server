@@ -12,8 +12,13 @@ import (
 	"github.com/buildwithgrove/path-external-auth-server/store"
 )
 
-// TODO_IMPROVE(@commoddity): Get this from the database
-const freeTierMonthlyUserLimit = 150_000
+// 💡IMPORTANT💡: This value is used to determine the PLAN_FREE monthly relay limit.
+//
+// TODO_TECHDEBT(@commoddity): When the Portal DB is implemented,
+// this value should be fetched from the Postgres database.
+//
+// Once PLAN_FREE accounts hit this limit, they are rate limited until the start of the next month.
+const FreeMonthlyRelays = 1_000_000
 
 // accountRateLimitStore interface provides an in-memory store of account rate limits.
 type accountRateLimitStore interface {
@@ -97,7 +102,7 @@ func (rls *rateLimitStore) updateRateLimitedAccounts() error {
 	// Get month-to-date usage for accounts over the threshold
 	usageData, err := rls.dataWarehouseDriver.GetMonthToMomentUsage(
 		context.Background(),
-		freeTierMonthlyUserLimit,
+		FreeMonthlyRelays,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to get monthly usage data: %w", err)
@@ -149,7 +154,7 @@ func (rls *rateLimitStore) shouldLimitAccount(rateLimit store.RateLimit, usage i
 	switch rateLimit.PlanType {
 	case grovedb.PlanFree_DatabaseType:
 		// For free plan, check against the free tier limit
-		return usage > freeTierMonthlyUserLimit
+		return usage > FreeMonthlyRelays
 
 	case grovedb.PlanUnlimited_DatabaseType:
 		// For unlimited plan, check against the account's specific monthly limit (if set)
