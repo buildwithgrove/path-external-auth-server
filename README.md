@@ -16,9 +16,12 @@
   - [How It Works](#how-it-works)
   - [Configuration](#configuration)
 - [Envoy Gateway Integration](#envoy-gateway-integration)
+- [Prometheus Metrics](#prometheus-metrics)
+  - [Key Metrics](#key-metrics)
+  - [Usage](#usage)
 - [Getting Portal App Auth \& Rate Limit Status](#getting-portal-app-auth--rate-limit-status)
   - [Prerequisites](#prerequisites)
-  - [Usage](#usage)
+  - [Usage](#usage-1)
   - [Example Output](#example-output)
 - [PEAS Environment Variables](#peas-environment-variables)
 
@@ -141,6 +144,44 @@ For more information see:
 - [Envoy Gateway External Authorization Docs](https://gateway.envoyproxy.io/docs/tasks/security/ext-auth/)
 - [Envoy Proxy `ext_authz` HTTP Filter Docs](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter)
 
+## Prometheus Metrics
+
+PEAS exposes Prometheus metrics on the `/metrics` endpoint for monitoring authorization performance and system health.
+
+### Key Metrics
+
+| Metric                                  | Type      | Description                                                                     |
+| --------------------------------------- | --------- | ------------------------------------------------------------------------------- |
+| `peas_auth_requests_total`              | Counter   | Authorization requests by portal app, account, status, and error type           |
+| `peas_auth_request_duration_seconds`    | Histogram | Authorization request processing time                                           |
+| `peas_rate_limit_checks_total`          | Counter   | Rate limiting decisions by account, plan type, and outcome                      |
+| `peas_store_size_total`                 | Gauge     | Current size of in-memory stores (portal apps, accounts, rate limited accounts) |
+| `peas_account_usage_total`              | Gauge     | Monthly usage for accounts exceeding their limits                               |
+| `peas_data_source_refresh_errors_total` | Counter   | Errors during Postgres and BigQuery data refresh operations                     |
+
+### Usage
+
+Metrics are automatically collected when PEAS is running. The metrics server exposes multiple endpoints:
+
+- `/metrics` - Prometheus metrics endpoint  
+- `/healthz` - Health check endpoint (returns JSON with status, service, and version)
+
+Configure your Prometheus server to scrape the `/metrics` endpoint on port `9090` (or the port specified by `METRICS_PORT`).
+
+PEAS also provides a pprof server on port `6060` (or `PPROF_PORT`) at `/debug/pprof/` for runtime profiling.
+
+**Example Grafana Queries:**
+```promql
+# Authorization success rate
+rate(peas_auth_requests_total{status="authorized"}[5m])
+
+# Accounts over monthly limit (current month)
+peas_account_usage_total
+
+# Rate limiting effectiveness
+peas_rate_limit_checks_total{decision="rate_limited"}
+```
+
 ## Getting Portal App Auth & Rate Limit Status
 
 PEAS includes a convenient Makefile target for testing authorization and rate limit status for Portal Apps during development.
@@ -230,5 +271,8 @@ PEAS is configured via environment variables.
 | -------------------------- | -------- | -------- | --------------------------------------------------------------------- | ---------------------------------------------------- | ------------- |
 | POSTGRES_CONNECTION_STRING | ✅        | string   | The PostgreSQL connection string for the database with PortalApp data | postgresql://username:password@localhost:5432/dbname | -             |
 | PORT                       | ❌        | int      | The port to run the external auth server on                           | 10001                                                | 10001         |
+| METRICS_PORT               | ❌        | int      | The port to run the Prometheus metrics server on                      | 9090                                                 | 9090          |
+| PPROF_PORT                 | ❌        | int      | The port to run the pprof server on                                   | 6060                                                 | 6060          |
+| IMAGE_TAG                  | ❌        | string   | The image tag/version for the application                             | v1.0.0                                               | unknown       |
 | LOGGER_LEVEL               | ❌        | string   | The log level to use for the external auth server                     | info                                                 | info          |
 | REFRESH_INTERVAL           | ❌        | duration | The interval for refreshing portal app data from the database         | 30s, 1m, 2m30s                                       | 30s           |

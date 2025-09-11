@@ -8,6 +8,7 @@ import (
 
 	"github.com/pokt-network/poktroll/pkg/polylog"
 
+	"github.com/buildwithgrove/path-external-auth-server/metrics"
 	grovedb "github.com/buildwithgrove/path-external-auth-server/postgres/grove"
 	"github.com/buildwithgrove/path-external-auth-server/store"
 )
@@ -61,6 +62,8 @@ func NewRateLimitStore(
 		rls.logger.Error().
 			Err(err).
 			Msg("Failed to perform initial rate limit check")
+		// Set initial metrics to zero if initial check fails
+		rls.updateStoreMetrics(0, 0)
 	}
 
 	// Start the background rate limit monitoring
@@ -100,18 +103,19 @@ func (rls *rateLimitStore) updateRateLimitedAccounts() error {
 	rls.logger.Debug().Msg("🔍 Checking account rate limits")
 
 	// Get month-to-date usage for accounts over the threshold
-	usageData, err := rls.dataWarehouseDriver.GetMonthToMomentUsage(
+	accountUsageOverMonthlyRelayLimit, err := rls.dataWarehouseDriver.GetMonthToMomentUsage(
 		context.Background(),
 		FreeMonthlyRelays,
 	)
 	if err != nil {
+		metrics.RecordDataSourceRefreshError("rate_limit_store", "bigquery_error")
 		return fmt.Errorf("failed to get monthly usage data: %w", err)
 	}
 
 	// Build new rate limited accounts map
 	newRateLimitedAccounts := make(map[store.AccountID]bool)
 
-	for accountIDStr, usage := range usageData {
+	for accountIDStr, usage := range accountUsageOverMonthlyRelayLimit {
 		accountID := store.AccountID(accountIDStr)
 
 		// Get the account's rate limit configuration
@@ -120,6 +124,10 @@ func (rls *rateLimitStore) updateRateLimitedAccounts() error {
 			// Skip accounts without rate limit configuration
 			continue
 		}
+
+		// Update account usage metrics for accounts over monthly limit
+		planType := string(rateLimit.PlanType)
+		metrics.UpdateAccountUsage(string(accountID), planType, float64(usage))
 
 		// Check if account should be rate limited based on plan type
 		shouldLimit := rls.shouldLimitAccount(rateLimit, usage)
@@ -139,9 +147,12 @@ func (rls *rateLimitStore) updateRateLimitedAccounts() error {
 	rls.rateLimitedAccounts = newRateLimitedAccounts
 	rls.rateLimitedAccountsMu.Unlock()
 
+	// Update store size metrics
+	rls.updateStoreMetrics(len(accountUsageOverMonthlyRelayLimit), len(newRateLimitedAccounts))
+
 	updateDuration := time.Since(startTime)
 	rls.logger.Info().
-		Int("total_accounts_checked", len(usageData)).
+		Int("total_accounts_over_monthly_relay_limit", len(accountUsageOverMonthlyRelayLimit)).
 		Int("rate_limited_accounts", len(newRateLimitedAccounts)).
 		Int64("update_duration_ms", updateDuration.Milliseconds()).
 		Msg("✅ Rate limit check completed")
@@ -171,4 +182,10 @@ func (rls *rateLimitStore) shouldLimitAccount(rateLimit store.RateLimit, usage i
 			Msg("Unknown plan type encountered")
 		return false
 	}
+}
+
+// updateStoreMetrics updates the Prometheus metrics for rate limit store sizes.
+func (rls *rateLimitStore) updateStoreMetrics(accountsOverLimit, rateLimitedAccounts int) {
+	metrics.UpdateStoreSize("accounts_over_monthly_limit", float64(accountsOverLimit))
+	metrics.UpdateStoreSize("rate_limited_accounts", float64(rateLimitedAccounts))
 }

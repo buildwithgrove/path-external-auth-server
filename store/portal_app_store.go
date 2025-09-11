@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/pokt-network/poktroll/pkg/polylog"
+
+	"github.com/buildwithgrove/path-external-auth-server/metrics"
 )
 
 // portalAppStore is an in-memory store for portal apps and their associated data.
@@ -95,8 +97,12 @@ func (c *portalAppStore) initializeStore() error {
 
 	err := c.setStoreData()
 	if err != nil {
+		metrics.RecordDataSourceRefreshError("portal_app_store", "postgres_error")
 		return fmt.Errorf("failed to set initial store data: %w", err)
 	}
+
+	// Update initial store size metrics
+	c.updateStoreMetrics()
 
 	c.logger.Info().Msg("🌱 Successfully fetched initial data from data source")
 	return nil
@@ -127,6 +133,7 @@ func (c *portalAppStore) refreshStore() error {
 
 	err := c.setStoreData()
 	if err != nil {
+		metrics.RecordDataSourceRefreshError("portal_app_store", "postgres_error")
 		return fmt.Errorf("failed to refresh store data: %w", err)
 	}
 
@@ -135,6 +142,9 @@ func (c *portalAppStore) refreshStore() error {
 		Int("portal_app_count", len(c.portalApps)).
 		Int64("refresh_duration_ms", refreshDuration.Milliseconds()).
 		Msg("🌿 Successfully refreshed portal apps from data source")
+
+	// Update store size metrics
+	c.updateStoreMetrics()
 
 	return nil
 }
@@ -154,6 +164,21 @@ func (c *portalAppStore) setStoreData() error {
 	c.setAccountRateLimits(portalApps)
 
 	return nil
+}
+
+// updateStoreMetrics updates the Prometheus metrics for store sizes.
+func (c *portalAppStore) updateStoreMetrics() {
+	c.portalAppsMu.RLock()
+	portalAppCount := len(c.portalApps)
+	c.portalAppsMu.RUnlock()
+
+	c.accountRateLimitsMu.RLock()
+	accountCount := len(c.accountRateLimits)
+	c.accountRateLimitsMu.RUnlock()
+
+	// Update store size metrics
+	metrics.UpdateStoreSize("portal_apps", float64(portalAppCount))
+	metrics.UpdateStoreSize("accounts", float64(accountCount))
 }
 
 // setAccountRateLimits extracts and caches account rate limits from portal apps.

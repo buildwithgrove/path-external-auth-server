@@ -34,6 +34,9 @@ func main() {
 	logger.Info().Str("logger_level", env.loggerLevel).
 		Msg("🫛 Starting PEAS (Path External Auth Server) ...")
 
+	// Create context for graceful shutdown
+	ctx := context.Background()
+
 	// Create a new postgres data source
 	postgresDataSource, err := grove.NewGrovePostgresDriver(
 		logger, env.postgresConnectionString,
@@ -74,6 +77,16 @@ func main() {
 		panic(err)
 	}
 	logger.Info().Msg("✅ Successfully initialized rate limit store")
+
+	// Setup and start Prometheus metrics server (includes /healthz endpoint)
+	metricsAddr := fmt.Sprintf(":%d", env.metricsPort)
+	if err := setupMetricsServer(logger, metricsAddr, env.imageTag); err != nil {
+		panic(fmt.Sprintf("failed to start metrics server: %v", err))
+	}
+
+	// Setup and start pprof server
+	pprofAddr := fmt.Sprintf(":%d", env.pprofPort)
+	setupPprofServer(ctx, logger, pprofAddr)
 
 	// Create a new listener to listen for requests from GUARD
 	listen, err := net.Listen("tcp", fmt.Sprintf(":%d", env.port))
