@@ -359,21 +359,4 @@ For production deployments, you can import the dashboard manually.
 
 #### Importing Dashboard to Production Grafana
 
-To import the PEAS dashboard into your production Grafana instance:
-
-1. **Access Grafana**: Log into your production Grafana instance
-2. **Navigate to Import**: Click the "+" (Plus) icon in the left sidebar → Select "Import"
-3. **Upload Dashboard**:
-   - **Option A**: Click "Upload JSON file" and select `grafana/dashboard.json` from this repository
-   - **Option B**: Copy the contents of `grafana/dashboard.json` and paste into the "Import via panel json" text area
-4. **Configure Settings**:
-   - **Dashboard Name**: Modify if needed (default: "PEAS - PATH External Auth Server")
-   - **Folder**: Choose destination folder
-   - **UID**: Leave empty for auto-generation or set custom UID
-   - **Data Sources**: Map to your production Prometheus data source
-5. **Complete Import**: Review the preview and click "Import"
-
-**Prerequisites for Production Import:**
-- Prometheus data source configured in your Grafana instance
-- PEAS application running and emitting metrics to Prometheus
-- Appropriate permissions to import dashboards
+To import the PEAS dashboard into your production Grafana instance follow the documentation on the [Grafana documentation](https://grafana.com/docs/grafana/latest/dashboards/build-dashboards/import-dashboards/).
