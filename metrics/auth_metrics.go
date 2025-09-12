@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -117,6 +118,7 @@ var (
 	// Set as gauge with labels:
 	//   - account_id: Account ID that is over the monthly limit
 	//   - plan_type: "PLAN_FREE", "PLAN_UNLIMITED"
+	//   - rate_limit: monthly rate limit for the account
 	//
 	// Note: Usage values only increase during the month and reset at month boundaries.
 	// Use Grafana queries with time-based filtering to show current month data only.
@@ -131,7 +133,7 @@ var (
 			Name:      accountUsageTotalMetricName,
 			Help:      "Monthly usage for accounts that exceed their monthly limit.",
 		},
-		[]string{"account_id", "plan_type"},
+		[]string{"account_id", "plan_type", "rate_limit"},
 	)
 
 	// rateLimitedAccountsTotal tracks accounts that are currently rate limited.
@@ -139,6 +141,7 @@ var (
 	//   - account_id: Account ID that is rate limited
 	//   - plan_type: "PLAN_FREE", "PLAN_UNLIMITED"
 	//   - monthly_usage: Current monthly usage
+	//   - rate_limit: monthly rate limit for the account
 	//
 	// Usage:
 	// - Monitor which specific accounts are currently rate limited
@@ -149,7 +152,7 @@ var (
 			Name:      "rate_limited_accounts_total",
 			Help:      "Accounts currently rate limited, labeled by account ID, plan type, and monthly usage.",
 		},
-		[]string{"account_id", "plan_type", "monthly_usage"},
+		[]string{"account_id", "plan_type", "monthly_usage", "rate_limit"},
 	)
 
 	// dataSourceRefreshErrorsTotal tracks errors during data source refresh operations.
@@ -219,20 +222,28 @@ func UpdateStoreSize(
 func UpdateAccountUsage(
 	accountID string,
 	planType string,
-	usage float64,
+	monthlyUsage float64,
+	rateLimit int32,
 ) {
 	accountUsageTotal.With(prometheus.Labels{
 		"account_id": accountID,
 		"plan_type":  planType,
-	}).Set(usage)
+		"rate_limit": strconv.FormatInt(int64(rateLimit), 10),
+	}).Set(monthlyUsage)
 }
 
 // Function to update rate limited accounts
-func UpdateRateLimitedAccounts(accountID string, planType string, monthlyUsage float64) {
+func UpdateRateLimitedAccounts(
+	accountID string,
+	planType string,
+	monthlyUsage float64,
+	rateLimit int32,
+) {
 	rateLimitedAccountsTotal.With(prometheus.Labels{
 		"account_id":    accountID,
 		"plan_type":     planType,
 		"monthly_usage": fmt.Sprintf("%.2f", monthlyUsage),
+		"rate_limit":    strconv.FormatInt(int64(rateLimit), 10),
 	}).Set(monthlyUsage)
 }
 

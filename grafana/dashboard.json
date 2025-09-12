@@ -536,7 +536,7 @@
             },
             "gridPos": {
                 "h": 8,
-                "w": 12,
+                "w": 8,
                 "x": 0,
                 "y": 12
             },
@@ -633,8 +633,8 @@
             },
             "gridPos": {
                 "h": 8,
-                "w": 12,
-                "x": 12,
+                "w": 8,
+                "x": 8,
                 "y": 12
             },
             "id": 8,
@@ -708,7 +708,7 @@
             "gridPos": {
                 "h": 4,
                 "w": 6,
-                "x": 0,
+                "x": 6,
                 "y": 20
             },
             "id": 9,
@@ -765,7 +765,7 @@
             "gridPos": {
                 "h": 4,
                 "w": 6,
-                "x": 6,
+                "x": 12,
                 "y": 20
             },
             "id": 10,
@@ -822,7 +822,7 @@
             "gridPos": {
                 "h": 4,
                 "w": 6,
-                "x": 12,
+                "x": 0,
                 "y": 20
             },
             "id": 11,
@@ -907,7 +907,7 @@
                     "refId": "A"
                 }
             ],
-            "title": "Accounts Over Limit",
+            "title": "Accounts Over Monthly Free Relay Limit",
             "type": "stat"
         },
         {
@@ -943,8 +943,8 @@
             "gridPos": {
                 "h": 8,
                 "w": 12,
-                "x": 0,
-                "y": 24
+                "x": 12,
+                "y": 28
             },
             "id": 13,
             "options": {
@@ -965,13 +965,13 @@
                     "datasource": {
                         "type": "prometheus"
                     },
-                    "expr": "peas_account_usage_total",
+                    "expr": "peas_account_usage_total > 0",
                     "format": "table",
                     "instant": true,
                     "refId": "A"
                 }
             ],
-            "title": "Accounts Over Limit",
+            "title": "Accounts Over Monthly Free Relay Limit",
             "transformations": [
                 {
                     "id": "organize",
@@ -986,20 +986,9 @@
                         "renameByName": {
                             "Value": "Monthly Usage",
                             "account_id": "Account ID",
-                            "plan_type": "Plan Type"
+                            "plan_type": "Plan Type",
+                            "rate_limit": "Rate Limit"
                         }
-                    }
-                },
-                {
-                    "id": "sortBy",
-                    "options": {
-                        "fields": {},
-                        "sort": [
-                            {
-                                "field": "Monthly Usage",
-                                "desc": true
-                            }
-                        ]
                     }
                 },
                 {
@@ -1072,9 +1061,9 @@
             },
             "gridPos": {
                 "h": 8,
-                "w": 12,
-                "x": 12,
-                "y": 24
+                "w": 8,
+                "x": 16,
+                "y": 12
             },
             "id": 14,
             "options": {
@@ -1136,7 +1125,7 @@
                 "h": 8,
                 "w": 12,
                 "x": 0,
-                "y": 12
+                "y": 28
             },
             "id": 15,
             "options": {
@@ -1157,7 +1146,7 @@
                     "datasource": {
                         "type": "prometheus"
                     },
-                    "expr": "rate_limited_accounts_total",
+                    "expr": "peas_rate_limited_accounts_total > 0",
                     "format": "table",
                     "instant": true,
                     "refId": "A"
@@ -1178,8 +1167,21 @@
                         "renameByName": {
                             "Value": "Monthly Usage",
                             "account_id": "Account ID",
-                            "plan_type": "Plan Type"
+                            "plan_type": "Plan Type",
+                            "rate_limit": "Rate Limit"
                         }
+                    }
+                },
+                {
+                    "id": "sortBy",
+                    "options": {
+                        "fields": {},
+                        "sort": [
+                            {
+                                "field": "Monthly Usage",
+                                "desc": true
+                            }
+                        ]
                     }
                 }
             ],

@@ -126,27 +126,23 @@ func (rls *rateLimitStore) updateRateLimitedAccounts() error {
 			continue
 		}
 
+		// Get the account's rate limit
+		// Will return 0 if no rate limit is configured
+		rateLimit := rls.getRateLimit(portalApp)
+
 		// Update account usage metrics for accounts over monthly limit
 		planType := string(portalApp.PlanType)
-		metrics.UpdateAccountUsage(string(accountID), planType, float64(usage))
-
-		// Get the account's rate limit
-		rateLimit := portalApp.RateLimit
-		if rateLimit == nil {
-			// Skip accounts without rate limit configuration
-			continue
-		}
+		metrics.UpdateAccountUsage(string(accountID), planType, float64(usage), rateLimit)
 
 		// Check if account should be rate limited based on plan type
-		shouldLimit := rls.shouldLimitAccount(*rateLimit, portalApp.PlanType, usage)
+		shouldLimit := rls.shouldLimitAccount(rateLimit, usage)
 		if shouldLimit {
 			newRateLimitedAccounts[accountID] = true
-			metrics.UpdateRateLimitedAccounts(string(accountID), planType, float64(usage))
+			metrics.UpdateRateLimitedAccounts(string(accountID), planType, float64(usage), rateLimit)
 			rls.logger.Debug().
 				Str("account_id", string(accountID)).
 				Str("plan_type", string(portalApp.PlanType)).
 				Int64("usage", usage).
-				Int32("monthly_limit", rateLimit.MonthlyUserLimit).
 				Msg("🚫 Account rate limited")
 		}
 	}
@@ -169,32 +165,35 @@ func (rls *rateLimitStore) updateRateLimitedAccounts() error {
 	return nil
 }
 
-// shouldLimitAccount determines if an account should be rate limited based on its plan and usage.
-func (rls *rateLimitStore) shouldLimitAccount(
-	rateLimit store.RateLimit,
-	planType store.PlanType,
-	usage int64,
-) bool {
-	switch planType {
-	case grovedb.PlanFree_DatabaseType:
-		// For free plan, check against the free tier limit
-		return usage > FreeMonthlyRelays
+// getRateLimit gets the rate limit for an account based on its plan type and rate limit configuration.
+func (rls *rateLimitStore) getRateLimit(portalApp *store.PortalApp) int32 {
+	if portalApp.RateLimit == nil {
+		return 0
+	}
 
+	switch portalApp.PlanType {
+	case grovedb.PlanFree_DatabaseType:
+		// For free plan, return the free tier limit
+		return FreeMonthlyRelays
 	case grovedb.PlanUnlimited_DatabaseType:
 		// For unlimited plan, check against the account's specific monthly limit (if set)
-		if rateLimit.MonthlyUserLimit > 0 {
-			return usage > int64(rateLimit.MonthlyUserLimit)
+		if portalApp.RateLimit.MonthlyUserLimit > 0 {
+			return portalApp.RateLimit.MonthlyUserLimit
 		}
 		// If no limit is set for unlimited plan, don't rate limit
-		return false
-
+		return 0
 	default:
-		// Unknown plan type - don't rate limit by default
-		rls.logger.Warn().
-			Str("plan_type", string(planType)).
-			Msg("Unknown plan type encountered")
+		return 0
+	}
+}
+
+// shouldLimitAccount determines if an account should be rate limited based on its rate limit and usage.
+func (rls *rateLimitStore) shouldLimitAccount(rateLimit int32, usage int64) bool {
+	// If rate limit is 0, don't rate limit (unlimited)
+	if rateLimit == 0 {
 		return false
 	}
+	return usage > int64(rateLimit)
 }
 
 // updateStoreMetrics updates the Prometheus metrics for rate limit store sizes.

@@ -304,72 +304,32 @@ func TestUpdateRateLimitedAccounts(t *testing.T) {
 func TestShouldLimitAccount(t *testing.T) {
 	tests := []struct {
 		name           string
-		rateLimit      store.RateLimit
-		planType       store.PlanType
+		rateLimit      int32
 		usage          int64
 		expectedResult bool
 	}{
 		{
-			name: "should limit free plan account over free tier limit",
-			rateLimit: store.RateLimit{
-				MonthlyUserLimit: 0,
-			},
-			planType:       grovedb.PlanFree_DatabaseType,
-			usage:          FreeMonthlyRelays + 1000,
+			name:           "should limit account over rate limit",
+			rateLimit:      1000_000,
+			usage:          1000_001,
 			expectedResult: true,
 		},
 		{
-			name: "should not limit free plan account under free tier limit",
-			rateLimit: store.RateLimit{
-				MonthlyUserLimit: 0,
-			},
-			planType:       grovedb.PlanFree_DatabaseType,
-			usage:          FreeMonthlyRelays - 1000,
+			name:           "should not limit account under rate limit",
+			rateLimit:      1000_000,
+			usage:          999_999,
 			expectedResult: false,
 		},
 		{
-			name: "should limit free plan account exactly at free tier limit",
-			rateLimit: store.RateLimit{
-				MonthlyUserLimit: 0,
-			},
-			planType:       grovedb.PlanFree_DatabaseType,
-			usage:          FreeMonthlyRelays,
+			name:           "should not limit account exactly at rate limit",
+			rateLimit:      1000_000,
+			usage:          1000_000,
 			expectedResult: false, // > comparison, so exactly at limit is not limited
 		},
 		{
-			name: "should limit unlimited plan account over custom limit",
-			rateLimit: store.RateLimit{
-				MonthlyUserLimit: 500_000,
-			},
-			planType:       grovedb.PlanUnlimited_DatabaseType,
-			usage:          600_000,
-			expectedResult: true,
-		},
-		{
-			name: "should not limit unlimited plan account under custom limit",
-			rateLimit: store.RateLimit{
-				MonthlyUserLimit: 500_000,
-			},
-			planType:       grovedb.PlanUnlimited_DatabaseType,
-			usage:          400_000,
-			expectedResult: false,
-		},
-		{
-			name: "should not limit unlimited plan account with no custom limit",
-			rateLimit: store.RateLimit{
-				MonthlyUserLimit: 0,
-			},
-			planType:       grovedb.PlanUnlimited_DatabaseType,
-			usage:          FreeMonthlyRelays,
-			expectedResult: false,
-		},
-		{
-			name: "should not limit unknown plan type",
-			rateLimit: store.RateLimit{
-				MonthlyUserLimit: 100_000,
-			},
-			planType:       "PLAN_UNKNOWN",
-			usage:          200_000,
+			name:           "should not limit account with zero rate limit",
+			rateLimit:      0,
+			usage:          500_000,
 			expectedResult: false,
 		},
 	}
@@ -382,8 +342,78 @@ func TestShouldLimitAccount(t *testing.T) {
 				logger: polyzero.NewLogger(),
 			}
 
-			result := rls.shouldLimitAccount(test.rateLimit, test.planType, test.usage)
+			result := rls.shouldLimitAccount(test.rateLimit, test.usage)
 			c.Equal(test.expectedResult, result)
+		})
+	}
+}
+
+func TestGetRateLimit(t *testing.T) {
+	tests := []struct {
+		name              string
+		portalApp         *store.PortalApp
+		expectedRateLimit int32
+	}{
+		{
+			name: "should return free tier limit for free plan",
+			portalApp: &store.PortalApp{
+				PlanType: grovedb.PlanFree_DatabaseType,
+				RateLimit: &store.RateLimit{
+					MonthlyUserLimit: 0,
+				},
+			},
+			expectedRateLimit: FreeMonthlyRelays,
+		},
+		{
+			name: "should return custom limit for unlimited plan with limit set",
+			portalApp: &store.PortalApp{
+				PlanType: grovedb.PlanUnlimited_DatabaseType,
+				RateLimit: &store.RateLimit{
+					MonthlyUserLimit: 500_000,
+				},
+			},
+			expectedRateLimit: 500_000,
+		},
+		{
+			name: "should return zero for unlimited plan with no limit set",
+			portalApp: &store.PortalApp{
+				PlanType: grovedb.PlanUnlimited_DatabaseType,
+				RateLimit: &store.RateLimit{
+					MonthlyUserLimit: 0,
+				},
+			},
+			expectedRateLimit: 0,
+		},
+		{
+			name: "should return zero for portal app with no rate limit configured",
+			portalApp: &store.PortalApp{
+				PlanType:  grovedb.PlanFree_DatabaseType,
+				RateLimit: nil,
+			},
+			expectedRateLimit: 0,
+		},
+		{
+			name: "should return zero for unknown plan type",
+			portalApp: &store.PortalApp{
+				PlanType: "PLAN_UNKNOWN",
+				RateLimit: &store.RateLimit{
+					MonthlyUserLimit: 100_000,
+				},
+			},
+			expectedRateLimit: 0,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			c := require.New(t)
+
+			rls := &rateLimitStore{
+				logger: polyzero.NewLogger(),
+			}
+
+			result := rls.getRateLimit(test.portalApp)
+			c.Equal(test.expectedRateLimit, result)
 		})
 	}
 }

@@ -188,11 +188,6 @@ func (c *portalAppStore) setAccountRateLimits(portalApps map[PortalAppID]*Portal
 	defer c.accountPortalAppsMu.Unlock()
 
 	for _, portalApp := range portalApps {
-		// Skip if portal app has no rate limit configured
-		if portalApp.RateLimit == nil {
-			continue
-		}
-
 		// Only set if not already present for this account ID
 		if _, exists := c.accountPortalApps[portalApp.AccountID]; !exists {
 			c.accountPortalApps[portalApp.AccountID] = portalApp

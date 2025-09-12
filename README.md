@@ -12,16 +12,18 @@
   - [`PortalApp` Structure](#portalapp-structure)
 - [Request Headers](#request-headers)
 - [Rate Limiting Implementation](#rate-limiting-implementation)
-- [Portal App Store Refresh](#portal-app-store-refresh)
   - [How It Works](#how-it-works)
+  - [Rate Limit Store Refresh](#rate-limit-store-refresh)
+- [Portal App Store Refresh](#portal-app-store-refresh)
+  - [How It Works](#how-it-works-1)
   - [Configuration](#configuration)
 - [Envoy Gateway Integration](#envoy-gateway-integration)
 - [Prometheus Metrics](#prometheus-metrics)
   - [Key Metrics](#key-metrics)
-  - [Usage](#usage)
+  - [Endpoints](#endpoints)
 - [Getting Portal App Auth \& Rate Limit Status](#getting-portal-app-auth--rate-limit-status)
   - [Prerequisites](#prerequisites)
-  - [Usage](#usage-1)
+  - [Usage](#usage)
   - [Example Output](#example-output)
 - [PEAS Environment Variables](#peas-environment-variables)
 - [Developing Metrics Dashboard Locally](#developing-metrics-dashboard-locally)
@@ -36,6 +38,7 @@
   - [Cleanup](#cleanup)
   - [Dashboard](#dashboard)
     - [Dashboard Screenshot](#dashboard-screenshot)
+    - [Importing Dashboard to Production Grafana](#importing-dashboard-to-production-grafana)
 
 ## Introduction
 
@@ -102,25 +105,32 @@ See `PortalApp` structure [here](https://github.com/buildwithgrove/path-external
 
 PEAS adds the following headers to authorized requests before forwarding them to the upstream service:
 
-| Header                  | Contents                                                                               | Included For All Requests                                            | Example Value |
-| ----------------------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------- |
-| `Portal-Application-ID` | The portal app ID of the authorized portal app                                         | ✅                                                                    | "a12b3c4d"    |
-| `Portal-Account-ID`     | The account ID associated with the portal app                                          | ✅                                                                    | "3f4g2js2"    |
-| `Rl-Plan-Free`          | The account ID for rate limiting purposes (PLAN_FREE)                                  | ❌ (Only for `PLAN_FREE` portal apps)                                 | "3f4g2js2"    |
-| `Rl-User-Limit-<X>`     | The account ID for rate limiting purposes with a user limit _(X = relays in millions)_ | ❌ (Only for `PLAN_UNLIMITED` portal apps with user-specified limits) | "3f4g2js2"    |
+| Header                  | Contents                                       | Included For All Requests | Example Value |
+| ----------------------- | ---------------------------------------------- | ------------------------- | ------------- |
+| `Portal-Application-ID` | The portal app ID of the authorized portal app | ✅                         | "a12b3c4d"    |
+| `Portal-Account-ID`     | The account ID associated with the portal app  | ✅                         | "3f4g2js2"    |
 
 ## Rate Limiting Implementation
 
-PEAS provides rate limiting capabilities through the following mechanisms:
+PEAS provides rate limiting capabilities through an in-memory rate limit store that tracks account usage and enforces monthly limits:
 
-1. **Plan-Based Rate Limiting**: For `PLAN_FREE` portal apps, PEAS will add headers like `Rl-Plan-Free: <account-id>`.
+### How It Works
 
-2. **User-Based Rate Limiting**: For `PLAN_UNLIMITED` portal apps with user-specified monthly limits, PEAS adds headers based on the limit in millions:
-   - 10 million monthly user limit: `Rl-User-Limit-10: <account-id>`
-   - 40 million monthly user limit: `Rl-User-Limit-40: <account-id>`
-   - etc..
+1. **Rate Limit Store**: Maintains an in-memory map of rate limited accounts, refreshed periodically from BigQuery data warehouse
+2. **Monthly Usage Tracking**: Monitors account usage against their monthly relay limits based on plan type
+3. **Plan-Based Limits**:
+   - **Free Plan (`PLAN_FREE`)**: 1,000,000 relays per month
+   - **Unlimited Plan (`PLAN_UNLIMITED`)**: Custom limits set per account, or unlimited if no limit specified
+4. **Real-time Enforcement**: Blocks requests from accounts that exceed their monthly limits
 
-These headers are processed by the Envoy rate limiter configured in the GUARD system, allowing for granular control over request rates.
+### Rate Limit Store Refresh
+
+The rate limit store automatically refreshes from the data warehouse to update account usage:
+
+- **Default Refresh Interval**: 5 minutes
+- **Data Source**: BigQuery data warehouse for monthly usage statistics  
+- **Configuration**: `RATE_LIMIT_STORE_REFRESH_INTERVAL` environment variable
+- **Monitoring**: Refresh operations are logged and metrics are available via Prometheus
 
 ## Portal App Store Refresh
 
@@ -158,41 +168,21 @@ For more information see:
 
 ## Prometheus Metrics
 
-PEAS exposes Prometheus metrics on the `/metrics` endpoint for monitoring authorization performance and system health.
+PEAS exposes Prometheus metrics on the `/metrics` endpoint for monitoring authorization performance, rate limiting, and system health.
 
 ### Key Metrics
 
-| Metric                                  | Type      | Description                                                                     |
-| --------------------------------------- | --------- | ------------------------------------------------------------------------------- |
-| `peas_auth_requests_total`              | Counter   | Authorization requests by portal app, account, status, and error type           |
-| `peas_auth_request_duration_seconds`    | Histogram | Authorization request processing time                                           |
-| `peas_rate_limit_checks_total`          | Counter   | Rate limiting decisions by account, plan type, and outcome                      |
-| `peas_store_size_total`                 | Gauge     | Current size of in-memory stores (portal apps, accounts, rate limited accounts) |
-| `peas_account_usage_total`              | Gauge     | Monthly usage for accounts exceeding their limits                               |
-| `peas_data_source_refresh_errors_total` | Counter   | Errors during Postgres and BigQuery data refresh operations                     |
+- **Authorization Metrics**: Request counts, success rates, and response times
+- **Rate Limiting Metrics**: Account usage, rate limit decisions, and store sizes  
+- **System Health**: Data source refresh errors and store performance
 
-### Usage
+### Endpoints
 
-Metrics are automatically collected when PEAS is running. The metrics server exposes multiple endpoints:
+- `/metrics` - Prometheus metrics endpoint (port `9090` by default)
+- `/healthz` - Health check endpoint  
+- `/debug/pprof/` - Runtime profiling (port `6060` by default)
 
-- `/metrics` - Prometheus metrics endpoint  
-- `/healthz` - Health check endpoint (returns JSON with status, service, and version)
-
-Configure your Prometheus server to scrape the `/metrics` endpoint on port `9090` (or the port specified by `METRICS_PORT`).
-
-PEAS also provides a pprof server on port `6060` (or `PPROF_PORT`) at `/debug/pprof/` for runtime profiling.
-
-**Example Grafana Queries:**
-```promql
-# Authorization success rate
-rate(peas_auth_requests_total{status="authorized"}[5m])
-
-# Accounts over monthly limit (current month)
-peas_account_usage_total
-
-# Rate limiting effectiveness
-peas_rate_limit_checks_total{decision="rate_limited"}
-```
+A comprehensive Grafana dashboard is available at `grafana/dashboard.json` for visualizing all metrics.
 
 ## Getting Portal App Auth & Rate Limit Status
 
@@ -262,13 +252,13 @@ make get_portal_app_auth_status PORTAL_APP_ID=1a2b3c4d API_KEY=4c352139ec5ca9288
 {
   "status": {
     "code": 7,
-    "message": "account is rate limited"
+    "message": "This account is rate limited. To upgrade your plan or modify your account settings, log in to your account at https://portal.grove.city/"
   },
   "deniedResponse": {
     "status": {
       "code": "TooManyRequests"
     },
-    "body": "{\"code\": 429, \"message\": \"account is rate limited\"}"
+    "body": "{\"code\": 429, \"message\": \"This account is rate limited. To upgrade your plan or modify your account settings, log in to your account at https://portal.grove.city/\"}"
   }
 }
 ```
@@ -279,15 +269,17 @@ This tool uses gRPC reflection to communicate with PEAS, testing the same author
 
 PEAS is configured via environment variables.
 
-| Variable                   | Required | Type     | Description                                                           | Example                                              | Default Value |
-| -------------------------- | -------- | -------- | --------------------------------------------------------------------- | ---------------------------------------------------- | ------------- |
-| POSTGRES_CONNECTION_STRING | ✅        | string   | The PostgreSQL connection string for the database with PortalApp data | postgresql://username:password@localhost:5432/dbname | -             |
-| PORT                       | ❌        | int      | The port to run the external auth server on                           | 10001                                                | 10001         |
-| METRICS_PORT               | ❌        | int      | The port to run the Prometheus metrics server on                      | 9090                                                 | 9090          |
-| PPROF_PORT                 | ❌        | int      | The port to run the pprof server on                                   | 6060                                                 | 6060          |
-| IMAGE_TAG                  | ❌        | string   | The image tag/version for the application                             | v1.0.0                                               | unknown       |
-| LOGGER_LEVEL               | ❌        | string   | The log level to use for the external auth server                     | info                                                 | info          |
-| REFRESH_INTERVAL           | ❌        | duration | The interval for refreshing portal app data from the database         | 30s, 1m, 2m30s                                       | 30s           |
+| Variable                          | Required | Type     | Description                                                  | Example                                              | Default Value |
+| --------------------------------- | -------- | -------- | ------------------------------------------------------------ | ---------------------------------------------------- | ------------- |
+| POSTGRES_CONNECTION_STRING        | ✅        | string   | PostgreSQL connection string for the PortalApp database      | postgresql://username:password@localhost:5432/dbname | -             |
+| GCP_PROJECT_ID                    | ✅        | string   | GCP project ID for the data warehouse used by rate limiting  | your-project-id                                      | -             |
+| PORT                              | ❌        | int      | Port to run the external auth server on                      | 10001                                                | 10001         |
+| METRICS_PORT                      | ❌        | int      | Port to run the Prometheus metrics server on                 | 9090                                                 | 9090          |
+| PPROF_PORT                        | ❌        | int      | Port to run the pprof server on                              | 6060                                                 | 6060          |
+| LOGGER_LEVEL                      | ❌        | string   | Log level for the external auth server                       | info, debug, warn, error                             | info          |
+| IMAGE_TAG                         | ❌        | string   | Image tag/version for the application                        | v1.0.0                                               | development   |
+| PORTAL_APP_STORE_REFRESH_INTERVAL | ❌        | duration | Refresh interval for portal app data from the database       | 30s, 1m, 2m30s                                       | 30s           |
+| RATE_LIMIT_STORE_REFRESH_INTERVAL | ❌        | duration | Refresh interval for rate limit data from the data warehouse | 30s, 1m, 2m30s                                       | 5m            |
 
 ## Developing Metrics Dashboard Locally
 
@@ -358,9 +350,30 @@ docker compose down -v  # Removes containers and volumes
 ```
 
 ### Dashboard
-The PEAS dashboard is automatically provisioned in Grafana. You can import or update it by replacing the dashboard JSON file in `grafana/dashboard.json`.
+The PEAS dashboard is automatically provisioned in Grafana when running the observability stack locally for development purposes.
 
-**Note:** The dashboard layout and panels may change over time. Refer to the dashboard in Grafana for the latest view.
+For production deployments, you can import the dashboard manually.
 
 #### Dashboard Screenshot
 ![Dashboard Screenshot](./.github/dashboard.png)
+
+#### Importing Dashboard to Production Grafana
+
+To import the PEAS dashboard into your production Grafana instance:
+
+1. **Access Grafana**: Log into your production Grafana instance
+2. **Navigate to Import**: Click the "+" (Plus) icon in the left sidebar → Select "Import"
+3. **Upload Dashboard**:
+   - **Option A**: Click "Upload JSON file" and select `grafana/dashboard.json` from this repository
+   - **Option B**: Copy the contents of `grafana/dashboard.json` and paste into the "Import via panel json" text area
+4. **Configure Settings**:
+   - **Dashboard Name**: Modify if needed (default: "PEAS - PATH External Auth Server")
+   - **Folder**: Choose destination folder
+   - **UID**: Leave empty for auto-generation or set custom UID
+   - **Data Sources**: Map to your production Prometheus data source
+5. **Complete Import**: Review the preview and click "Import"
+
+**Prerequisites for Production Import:**
+- Prometheus data source configured in your Grafana instance
+- PEAS application running and emitting metrics to Prometheus
+- Appropriate permissions to import dashboards
