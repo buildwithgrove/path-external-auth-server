@@ -24,6 +24,18 @@
   - [Usage](#usage-1)
   - [Example Output](#example-output)
 - [PEAS Environment Variables](#peas-environment-variables)
+- [Developing Metrics Dashboard Locally](#developing-metrics-dashboard-locally)
+  - [Stack Components](#stack-components)
+  - [Prerequisites](#prerequisites-1)
+  - [Quick Start](#quick-start)
+  - [Local Testing](#local-testing)
+    - [Test the health endpoint:](#test-the-health-endpoint)
+    - [Test the metrics endpoint:](#test-the-metrics-endpoint)
+    - [Generate some test traffic:](#generate-some-test-traffic)
+    - [Load Testing](#load-testing)
+  - [Cleanup](#cleanup)
+  - [Dashboard](#dashboard)
+    - [Dashboard Screenshot](#dashboard-screenshot)
 
 ## Introduction
 
@@ -276,3 +288,79 @@ PEAS is configured via environment variables.
 | IMAGE_TAG                  | ❌        | string   | The image tag/version for the application                             | v1.0.0                                               | unknown       |
 | LOGGER_LEVEL               | ❌        | string   | The log level to use for the external auth server                     | info                                                 | info          |
 | REFRESH_INTERVAL           | ❌        | duration | The interval for refreshing portal app data from the database         | 30s, 1m, 2m30s                                       | 30s           |
+
+## Developing Metrics Dashboard Locally
+
+This section describes how to run and test the PEAS metrics dashboard locally using Docker Compose, Prometheus, and Grafana.
+
+### Stack Components
+- **Prometheus**: Metrics collection from locally running PEAS
+- **Grafana**: Dashboard visualization using the PEAS dashboard
+
+### Prerequisites
+- **PEAS running locally**: Run PEAS directly on your machine (not in Docker)
+- Create a `.env` file in the parent directory (`../`) with your database credentials and configuration
+- Ensure you have access to your remote PostgreSQL and GCP BigQuery instances
+
+### Quick Start
+1. **Start the monitoring stack**:
+   ```bash
+   cd grafana/local
+   docker compose up -d
+   ```
+2. **Start PEAS locally** (in another terminal, from repo root):
+   ```bash
+   go run .
+   ```
+3. **Access the services**:
+   - **PEAS gRPC Server**: `localhost:10001`
+   - **PEAS Metrics**: `http://localhost:9090/metrics`
+   - **PEAS Health**: `http://localhost:9090/healthz`
+   - **PEAS pprof**: `http://localhost:6060/debug/pprof/`
+   - **Prometheus**: `http://localhost:9091`
+   - **Grafana**: `http://localhost:3000` (admin/admin)
+4. **View the dashboard**:
+   - Go to Grafana at `http://localhost:3000`
+   - Login with admin/admin
+   - The PEAS dashboard should be automatically loaded
+
+### Local Testing
+#### Test the health endpoint:
+```bash
+curl http://localhost:9090/healthz | jq
+```
+#### Test the metrics endpoint:
+```bash
+curl http://localhost:9090/metrics | grep peas_
+```
+#### Generate some test traffic:
+Since PEAS is a gRPC server, you can use grpcurl to send test requests:
+```bash
+# Install grpcurl if needed
+go install github.com/fullstorydev/grpcurl/cmd/grpcurl@latest
+# Test authorization request (will likely fail but generate metrics)
+grpcurl -plaintext localhost:10001 envoy.service.auth.v3.Authorization/Check
+```
+
+#### Load Testing
+You can run a load test using the provided script:
+```bash
+make load-test
+```
+Or with custom parameters:
+```bash
+make load-test-custom TOTAL_REQUESTS=5000 SUCCESS_RATE=80
+```
+
+### Cleanup
+```bash
+docker compose down -v  # Removes containers and volumes
+```
+
+### Dashboard
+The PEAS dashboard is automatically provisioned in Grafana. You can import or update it by replacing the dashboard JSON file in `grafana/dashboard.json`.
+
+**Note:** The dashboard layout and panels may change over time. Refer to the dashboard in Grafana for the latest view.
+
+#### Dashboard Screenshot
+![Dashboard Screenshot](./.github/dashboard.png)

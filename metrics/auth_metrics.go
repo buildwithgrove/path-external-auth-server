@@ -1,6 +1,8 @@
 package metrics
 
 import (
+	"fmt"
+
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -32,6 +34,7 @@ func init() {
 	prometheus.MustRegister(rateLimitChecksTotal)
 	prometheus.MustRegister(storeSizeTotal)
 	prometheus.MustRegister(accountUsageTotal)
+	prometheus.MustRegister(rateLimitedAccountsTotal)
 	prometheus.MustRegister(dataSourceRefreshErrorsTotal)
 }
 
@@ -131,6 +134,24 @@ var (
 		[]string{"account_id", "plan_type"},
 	)
 
+	// rateLimitedAccountsTotal tracks accounts that are currently rate limited.
+	// Set as gauge with labels:
+	//   - account_id: Account ID that is rate limited
+	//   - plan_type: "PLAN_FREE", "PLAN_UNLIMITED"
+	//   - monthly_usage: Current monthly usage
+	//
+	// Usage:
+	// - Monitor which specific accounts are currently rate limited
+	// - Track usage patterns for rate limited accounts
+	rateLimitedAccountsTotal = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Subsystem: peasProcess,
+			Name:      "rate_limited_accounts_total",
+			Help:      "Accounts currently rate limited, labeled by account ID, plan type, and monthly usage.",
+		},
+		[]string{"account_id", "plan_type", "monthly_usage"},
+	)
+
 	// dataSourceRefreshErrorsTotal tracks errors during data source refresh operations.
 	// Increment on refresh errors with labels:
 	//   - source_type: "portal_app_store", "rate_limit_store"
@@ -204,6 +225,15 @@ func UpdateAccountUsage(
 		"account_id": accountID,
 		"plan_type":  planType,
 	}).Set(usage)
+}
+
+// Function to update rate limited accounts
+func UpdateRateLimitedAccounts(accountID string, planType string, monthlyUsage float64) {
+	rateLimitedAccountsTotal.With(prometheus.Labels{
+		"account_id":    accountID,
+		"plan_type":     planType,
+		"monthly_usage": fmt.Sprintf("%.2f", monthlyUsage),
+	}).Set(monthlyUsage)
 }
 
 // RecordDataSourceRefreshError records an error during data source refresh.

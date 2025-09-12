@@ -139,3 +139,5 @@ get_portal_app_auth_status: ## Test auth/rate limit status for a Portal App ID (
 			localhost:10001 \
 			envoy.service.auth.v3.Authorization/Check | jq; \
 	fi
+
+include makefiles/local.mk
