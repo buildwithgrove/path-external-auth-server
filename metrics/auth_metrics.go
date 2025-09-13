@@ -232,7 +232,7 @@ func UpdateAccountUsage(
 	}).Set(monthlyUsage)
 }
 
-// Function to update rate limited accounts
+// UpdateRateLimitedAccounts updates the rate limited accounts metric with current usage data.
 func UpdateRateLimitedAccounts(
 	accountID string,
 	planType string,

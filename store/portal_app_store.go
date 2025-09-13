@@ -24,13 +24,11 @@ type portalAppStore struct {
 
 	// In-memory map of portal apps (portalAppID -> *PortalApp)
 	portalApps map[PortalAppID]*PortalApp
-
-	// In-memory map of account portal apps for rate limiting (accountID -> PortalApp)
-	accountPortalApps map[AccountID]*PortalApp
-
 	// Mutex to protect access to portalApps
 	portalAppsMu sync.RWMutex
 
+	// In-memory map of account portal apps for rate limiting (accountID -> PortalApp)
+	accountPortalApps map[AccountID]*PortalApp
 	// Mutex to protect access to accountPortalApps
 	accountPortalAppsMu sync.RWMutex
 }
