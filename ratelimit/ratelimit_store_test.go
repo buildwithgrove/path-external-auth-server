@@ -16,14 +16,14 @@ import (
 func TestNewRateLimitStore(t *testing.T) {
 	tests := []struct {
 		name                    string
-		setupMocks              func(*MockdataWarehouseDriver, *MockaccountRateLimitStore)
+		setupMocks              func(*MockdataWarehouseDriver, *MockaccountPortalAppStore)
 		expectError             bool
 		expectedInitialUpdate   bool
 		rateLimitUpdateInterval time.Duration
 	}{
 		{
 			name: "should create rate limit store successfully with successful initial update",
-			setupMocks: func(mockDWH *MockdataWarehouseDriver, mockAccountStore *MockaccountRateLimitStore) {
+			setupMocks: func(mockDWH *MockdataWarehouseDriver, mockAccountStore *MockaccountPortalAppStore) {
 				mockDWH.EXPECT().
 					GetMonthToMomentUsage(gomock.Any(), int64(FreeMonthlyRelays)).
 					Return(map[string]int64{}, nil)
@@ -34,7 +34,7 @@ func TestNewRateLimitStore(t *testing.T) {
 		},
 		{
 			name: "should create rate limit store successfully even with failed initial update",
-			setupMocks: func(mockDWH *MockdataWarehouseDriver, mockAccountStore *MockaccountRateLimitStore) {
+			setupMocks: func(mockDWH *MockdataWarehouseDriver, mockAccountStore *MockaccountPortalAppStore) {
 				mockDWH.EXPECT().
 					GetMonthToMomentUsage(gomock.Any(), int64(FreeMonthlyRelays)).
 					Return(nil, errors.New("dwh connection failed"))
@@ -53,7 +53,7 @@ func TestNewRateLimitStore(t *testing.T) {
 			defer ctrl.Finish()
 
 			mockDWH := NewMockdataWarehouseDriver(ctrl)
-			mockAccountStore := NewMockaccountRateLimitStore(ctrl)
+			mockAccountStore := NewMockaccountPortalAppStore(ctrl)
 
 			test.setupMocks(mockDWH, mockAccountStore)
 
@@ -73,7 +73,7 @@ func TestNewRateLimitStore(t *testing.T) {
 				c.NotNil(rls.rateLimitedAccounts)
 				c.NotNil(rls.logger)
 				c.Equal(mockDWH, rls.dataWarehouseDriver)
-				c.Equal(mockAccountStore, rls.accountRateLimitStore)
+				c.Equal(mockAccountStore, rls.accountPortalAppStore)
 			}
 		})
 	}
@@ -127,13 +127,13 @@ func TestIsAccountRateLimited(t *testing.T) {
 func TestUpdateRateLimitedAccounts(t *testing.T) {
 	tests := []struct {
 		name                     string
-		setupMocks               func(*MockdataWarehouseDriver, *MockaccountRateLimitStore)
+		setupMocks               func(*MockdataWarehouseDriver, *MockaccountPortalAppStore)
 		expectedRateLimitedCount int
 		expectError              bool
 	}{
 		{
 			name: "should update rate limited accounts with free plan account over limit",
-			setupMocks: func(mockDWH *MockdataWarehouseDriver, mockAccountStore *MockaccountRateLimitStore) {
+			setupMocks: func(mockDWH *MockdataWarehouseDriver, mockAccountStore *MockaccountPortalAppStore) {
 				usageData := map[string]int64{
 					"free_account_over_limit": FreeMonthlyRelays + 1000,
 				}
@@ -142,10 +142,12 @@ func TestUpdateRateLimitedAccounts(t *testing.T) {
 					Return(usageData, nil)
 
 				mockAccountStore.EXPECT().
-					GetAccountRateLimit(store.AccountID("free_account_over_limit")).
-					Return(store.RateLimit{
-						PlanType:         grovedb.PlanFree_DatabaseType,
-						MonthlyUserLimit: 0,
+					GetAccountPortalApp(store.AccountID("free_account_over_limit")).
+					Return(&store.PortalApp{
+						PlanType: grovedb.PlanFree_DatabaseType,
+						RateLimit: &store.RateLimit{
+							MonthlyUserLimit: 0,
+						},
 					}, true)
 			},
 			expectedRateLimitedCount: 1,
@@ -153,7 +155,7 @@ func TestUpdateRateLimitedAccounts(t *testing.T) {
 		},
 		{
 			name: "should not rate limit free plan account under limit",
-			setupMocks: func(mockDWH *MockdataWarehouseDriver, mockAccountStore *MockaccountRateLimitStore) {
+			setupMocks: func(mockDWH *MockdataWarehouseDriver, mockAccountStore *MockaccountPortalAppStore) {
 				usageData := map[string]int64{
 					"free_account_under_limit": FreeMonthlyRelays - 1000,
 				}
@@ -162,10 +164,12 @@ func TestUpdateRateLimitedAccounts(t *testing.T) {
 					Return(usageData, nil)
 
 				mockAccountStore.EXPECT().
-					GetAccountRateLimit(store.AccountID("free_account_under_limit")).
-					Return(store.RateLimit{
-						PlanType:         grovedb.PlanFree_DatabaseType,
-						MonthlyUserLimit: 0,
+					GetAccountPortalApp(store.AccountID("free_account_under_limit")).
+					Return(&store.PortalApp{
+						PlanType: grovedb.PlanFree_DatabaseType,
+						RateLimit: &store.RateLimit{
+							MonthlyUserLimit: 0,
+						},
 					}, true)
 			},
 			expectedRateLimitedCount: 0,
@@ -173,7 +177,7 @@ func TestUpdateRateLimitedAccounts(t *testing.T) {
 		},
 		{
 			name: "should rate limit unlimited plan account over custom limit",
-			setupMocks: func(mockDWH *MockdataWarehouseDriver, mockAccountStore *MockaccountRateLimitStore) {
+			setupMocks: func(mockDWH *MockdataWarehouseDriver, mockAccountStore *MockaccountPortalAppStore) {
 				usageData := map[string]int64{
 					"unlimited_account_over_custom_limit": 500_000,
 				}
@@ -182,10 +186,12 @@ func TestUpdateRateLimitedAccounts(t *testing.T) {
 					Return(usageData, nil)
 
 				mockAccountStore.EXPECT().
-					GetAccountRateLimit(store.AccountID("unlimited_account_over_custom_limit")).
-					Return(store.RateLimit{
-						PlanType:         grovedb.PlanUnlimited_DatabaseType,
-						MonthlyUserLimit: 400_000,
+					GetAccountPortalApp(store.AccountID("unlimited_account_over_custom_limit")).
+					Return(&store.PortalApp{
+						PlanType: grovedb.PlanUnlimited_DatabaseType,
+						RateLimit: &store.RateLimit{
+							MonthlyUserLimit: 400_000,
+						},
 					}, true)
 			},
 			expectedRateLimitedCount: 1,
@@ -193,7 +199,7 @@ func TestUpdateRateLimitedAccounts(t *testing.T) {
 		},
 		{
 			name: "should not rate limit unlimited plan account with no limit set",
-			setupMocks: func(mockDWH *MockdataWarehouseDriver, mockAccountStore *MockaccountRateLimitStore) {
+			setupMocks: func(mockDWH *MockdataWarehouseDriver, mockAccountStore *MockaccountPortalAppStore) {
 				usageData := map[string]int64{
 					"unlimited_account_no_limit": FreeMonthlyRelays,
 				}
@@ -202,10 +208,12 @@ func TestUpdateRateLimitedAccounts(t *testing.T) {
 					Return(usageData, nil)
 
 				mockAccountStore.EXPECT().
-					GetAccountRateLimit(store.AccountID("unlimited_account_no_limit")).
-					Return(store.RateLimit{
-						PlanType:         grovedb.PlanUnlimited_DatabaseType,
-						MonthlyUserLimit: 0, // No limit set
+					GetAccountPortalApp(store.AccountID("unlimited_account_no_limit")).
+					Return(&store.PortalApp{
+						PlanType: grovedb.PlanUnlimited_DatabaseType,
+						RateLimit: &store.RateLimit{
+							MonthlyUserLimit: 0, // No limit set
+						},
 					}, true)
 			},
 			expectedRateLimitedCount: 0,
@@ -213,7 +221,7 @@ func TestUpdateRateLimitedAccounts(t *testing.T) {
 		},
 		{
 			name: "should skip accounts without rate limit configuration",
-			setupMocks: func(mockDWH *MockdataWarehouseDriver, mockAccountStore *MockaccountRateLimitStore) {
+			setupMocks: func(mockDWH *MockdataWarehouseDriver, mockAccountStore *MockaccountPortalAppStore) {
 				usageData := map[string]int64{
 					"account_without_config": 500_000,
 				}
@@ -222,15 +230,15 @@ func TestUpdateRateLimitedAccounts(t *testing.T) {
 					Return(usageData, nil)
 
 				mockAccountStore.EXPECT().
-					GetAccountRateLimit(store.AccountID("account_without_config")).
-					Return(store.RateLimit{}, false)
+					GetAccountPortalApp(store.AccountID("account_without_config")).
+					Return(nil, false)
 			},
 			expectedRateLimitedCount: 0,
 			expectError:              false,
 		},
 		{
 			name: "should handle unknown plan types gracefully",
-			setupMocks: func(mockDWH *MockdataWarehouseDriver, mockAccountStore *MockaccountRateLimitStore) {
+			setupMocks: func(mockDWH *MockdataWarehouseDriver, mockAccountStore *MockaccountPortalAppStore) {
 				usageData := map[string]int64{
 					"account_unknown_plan": 500_000,
 				}
@@ -239,10 +247,12 @@ func TestUpdateRateLimitedAccounts(t *testing.T) {
 					Return(usageData, nil)
 
 				mockAccountStore.EXPECT().
-					GetAccountRateLimit(store.AccountID("account_unknown_plan")).
-					Return(store.RateLimit{
-						PlanType:         "PLAN_UNKNOWN",
-						MonthlyUserLimit: 100_000,
+					GetAccountPortalApp(store.AccountID("account_unknown_plan")).
+					Return(&store.PortalApp{
+						PlanType: "PLAN_UNKNOWN",
+						RateLimit: &store.RateLimit{
+							MonthlyUserLimit: 100_000,
+						},
 					}, true)
 			},
 			expectedRateLimitedCount: 0,
@@ -250,7 +260,7 @@ func TestUpdateRateLimitedAccounts(t *testing.T) {
 		},
 		{
 			name: "should return error when data warehouse fails",
-			setupMocks: func(mockDWH *MockdataWarehouseDriver, mockAccountStore *MockaccountRateLimitStore) {
+			setupMocks: func(mockDWH *MockdataWarehouseDriver, mockAccountStore *MockaccountPortalAppStore) {
 				mockDWH.EXPECT().
 					GetMonthToMomentUsage(gomock.Any(), int64(FreeMonthlyRelays)).
 					Return(nil, errors.New("data warehouse connection failed"))
@@ -268,14 +278,14 @@ func TestUpdateRateLimitedAccounts(t *testing.T) {
 			defer ctrl.Finish()
 
 			mockDWH := NewMockdataWarehouseDriver(ctrl)
-			mockAccountStore := NewMockaccountRateLimitStore(ctrl)
+			mockAccountStore := NewMockaccountPortalAppStore(ctrl)
 
 			test.setupMocks(mockDWH, mockAccountStore)
 
 			rls := &rateLimitStore{
 				logger:                polyzero.NewLogger(),
 				dataWarehouseDriver:   mockDWH,
-				accountRateLimitStore: mockAccountStore,
+				accountPortalAppStore: mockAccountStore,
 				rateLimitedAccounts:   make(map[store.AccountID]bool),
 			}
 
@@ -294,71 +304,32 @@ func TestUpdateRateLimitedAccounts(t *testing.T) {
 func TestShouldLimitAccount(t *testing.T) {
 	tests := []struct {
 		name           string
-		rateLimit      store.RateLimit
+		rateLimit      int32
 		usage          int64
 		expectedResult bool
 	}{
 		{
-			name: "should limit free plan account over free tier limit",
-			rateLimit: store.RateLimit{
-				PlanType:         grovedb.PlanFree_DatabaseType,
-				MonthlyUserLimit: 0,
-			},
-			usage:          FreeMonthlyRelays + 1000,
+			name:           "should limit account over rate limit",
+			rateLimit:      1000_000,
+			usage:          1000_001,
 			expectedResult: true,
 		},
 		{
-			name: "should not limit free plan account under free tier limit",
-			rateLimit: store.RateLimit{
-				PlanType:         grovedb.PlanFree_DatabaseType,
-				MonthlyUserLimit: 0,
-			},
-			usage:          FreeMonthlyRelays - 1000,
+			name:           "should not limit account under rate limit",
+			rateLimit:      1000_000,
+			usage:          999_999,
 			expectedResult: false,
 		},
 		{
-			name: "should limit free plan account exactly at free tier limit",
-			rateLimit: store.RateLimit{
-				PlanType:         grovedb.PlanFree_DatabaseType,
-				MonthlyUserLimit: 0,
-			},
-			usage:          FreeMonthlyRelays,
+			name:           "should not limit account exactly at rate limit",
+			rateLimit:      1000_000,
+			usage:          1000_000,
 			expectedResult: false, // > comparison, so exactly at limit is not limited
 		},
 		{
-			name: "should limit unlimited plan account over custom limit",
-			rateLimit: store.RateLimit{
-				PlanType:         grovedb.PlanUnlimited_DatabaseType,
-				MonthlyUserLimit: 500_000,
-			},
-			usage:          600_000,
-			expectedResult: true,
-		},
-		{
-			name: "should not limit unlimited plan account under custom limit",
-			rateLimit: store.RateLimit{
-				PlanType:         grovedb.PlanUnlimited_DatabaseType,
-				MonthlyUserLimit: 500_000,
-			},
-			usage:          400_000,
-			expectedResult: false,
-		},
-		{
-			name: "should not limit unlimited plan account with no custom limit",
-			rateLimit: store.RateLimit{
-				PlanType:         grovedb.PlanUnlimited_DatabaseType,
-				MonthlyUserLimit: 0,
-			},
-			usage:          FreeMonthlyRelays,
-			expectedResult: false,
-		},
-		{
-			name: "should not limit unknown plan type",
-			rateLimit: store.RateLimit{
-				PlanType:         "PLAN_UNKNOWN",
-				MonthlyUserLimit: 100_000,
-			},
-			usage:          200_000,
+			name:           "should not limit account with zero rate limit",
+			rateLimit:      0,
+			usage:          500_000,
 			expectedResult: false,
 		},
 	}
@@ -377,6 +348,76 @@ func TestShouldLimitAccount(t *testing.T) {
 	}
 }
 
+func TestGetRateLimit(t *testing.T) {
+	tests := []struct {
+		name              string
+		portalApp         *store.PortalApp
+		expectedRateLimit int32
+	}{
+		{
+			name: "should return free tier limit for free plan",
+			portalApp: &store.PortalApp{
+				PlanType: grovedb.PlanFree_DatabaseType,
+				RateLimit: &store.RateLimit{
+					MonthlyUserLimit: 0,
+				},
+			},
+			expectedRateLimit: FreeMonthlyRelays,
+		},
+		{
+			name: "should return custom limit for unlimited plan with limit set",
+			portalApp: &store.PortalApp{
+				PlanType: grovedb.PlanUnlimited_DatabaseType,
+				RateLimit: &store.RateLimit{
+					MonthlyUserLimit: 500_000,
+				},
+			},
+			expectedRateLimit: 500_000,
+		},
+		{
+			name: "should return zero for unlimited plan with no limit set",
+			portalApp: &store.PortalApp{
+				PlanType: grovedb.PlanUnlimited_DatabaseType,
+				RateLimit: &store.RateLimit{
+					MonthlyUserLimit: 0,
+				},
+			},
+			expectedRateLimit: 0,
+		},
+		{
+			name: "should return zero for portal app with no rate limit configured",
+			portalApp: &store.PortalApp{
+				PlanType:  grovedb.PlanFree_DatabaseType,
+				RateLimit: nil,
+			},
+			expectedRateLimit: 0,
+		},
+		{
+			name: "should return zero for unknown plan type",
+			portalApp: &store.PortalApp{
+				PlanType: "PLAN_UNKNOWN",
+				RateLimit: &store.RateLimit{
+					MonthlyUserLimit: 100_000,
+				},
+			},
+			expectedRateLimit: 0,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			c := require.New(t)
+
+			rls := &rateLimitStore{
+				logger: polyzero.NewLogger(),
+			}
+
+			result := rls.getRateLimit(test.portalApp)
+			c.Equal(test.expectedRateLimit, result)
+		})
+	}
+}
+
 func TestRateLimitStoreIntegration(t *testing.T) {
 	t.Run("should handle complete rate limiting workflow", func(t *testing.T) {
 		c := require.New(t)
@@ -385,7 +426,7 @@ func TestRateLimitStoreIntegration(t *testing.T) {
 		defer ctrl.Finish()
 
 		mockDWH := NewMockdataWarehouseDriver(ctrl)
-		mockAccountStore := NewMockaccountRateLimitStore(ctrl)
+		mockAccountStore := NewMockaccountPortalAppStore(ctrl)
 
 		// Setup initial data - one account over limit, one under
 		initialUsageData := map[string]int64{
@@ -400,22 +441,30 @@ func TestRateLimitStoreIntegration(t *testing.T) {
 			Return(initialUsageData, nil)
 
 		mockAccountStore.EXPECT().
-			GetAccountRateLimit(store.AccountID("free_account_over")).
-			Return(store.RateLimit{
+			GetAccountPortalApp(store.AccountID("free_account_over")).
+			Return(&store.PortalApp{
 				PlanType: grovedb.PlanFree_DatabaseType,
+				RateLimit: &store.RateLimit{
+					MonthlyUserLimit: 0,
+				},
 			}, true)
 
 		mockAccountStore.EXPECT().
-			GetAccountRateLimit(store.AccountID("free_account_under")).
-			Return(store.RateLimit{
+			GetAccountPortalApp(store.AccountID("free_account_under")).
+			Return(&store.PortalApp{
 				PlanType: grovedb.PlanFree_DatabaseType,
+				RateLimit: &store.RateLimit{
+					MonthlyUserLimit: 0,
+				},
 			}, true)
 
 		mockAccountStore.EXPECT().
-			GetAccountRateLimit(store.AccountID("unlimited_account")).
-			Return(store.RateLimit{
-				PlanType:         grovedb.PlanUnlimited_DatabaseType,
-				MonthlyUserLimit: 0, // No limit
+			GetAccountPortalApp(store.AccountID("unlimited_account")).
+			Return(&store.PortalApp{
+				PlanType: grovedb.PlanUnlimited_DatabaseType,
+				RateLimit: &store.RateLimit{
+					MonthlyUserLimit: 0, // No limit
+				},
 			}, true)
 
 		rls, err := NewRateLimitStore(

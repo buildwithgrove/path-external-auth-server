@@ -46,14 +46,14 @@ func Test_Integration_GetPortalApps(t *testing.T) {
 				"portal_app_1_no_auth": {
 					ID:        "portal_app_1_no_auth",
 					AccountID: "account_1",
+					PlanType:  PlanFree_DatabaseType,
 					Auth:      nil, // No auth required
-					RateLimit: &store.RateLimit{
-						PlanType: "PLAN_FREE",
-					},
+					RateLimit: &store.RateLimit{},
 				},
 				"portal_app_2_static_key": {
 					ID:        "portal_app_2_static_key",
 					AccountID: "account_2",
+					PlanType:  PlanUnlimited_DatabaseType,
 					Auth: &store.Auth{
 						APIKey: "secret_key_2",
 					},
@@ -61,24 +61,23 @@ func Test_Integration_GetPortalApps(t *testing.T) {
 				"portal_app_3_static_key": {
 					ID:        "portal_app_3_static_key",
 					AccountID: "account_3",
+					PlanType:  PlanFree_DatabaseType,
 					Auth: &store.Auth{
 						APIKey: "secret_key_3",
 					},
-					RateLimit: &store.RateLimit{
-						PlanType: "PLAN_FREE",
-					},
+					RateLimit: &store.RateLimit{},
 				},
 				"portal_app_4_no_auth": {
 					ID:        "portal_app_4_no_auth",
 					AccountID: "account_1",
+					PlanType:  PlanFree_DatabaseType,
 					Auth:      nil, // No auth required
-					RateLimit: &store.RateLimit{
-						PlanType: "PLAN_FREE",
-					},
+					RateLimit: &store.RateLimit{},
 				},
 				"portal_app_5_static_key": {
 					ID:        "portal_app_5_static_key",
 					AccountID: "account_2",
+					PlanType:  PlanUnlimited_DatabaseType,
 					Auth: &store.Auth{
 						APIKey: "secret_key_5",
 					},
@@ -86,9 +85,9 @@ func Test_Integration_GetPortalApps(t *testing.T) {
 				"portal_app_6_user_limit": {
 					ID:        "portal_app_6_user_limit",
 					AccountID: "account_4",
+					PlanType:  PlanUnlimited_DatabaseType,
 					Auth:      nil, // No auth required
 					RateLimit: &store.RateLimit{
-						PlanType:         "PLAN_UNLIMITED",
 						MonthlyUserLimit: 10_000_000,
 					},
 				},

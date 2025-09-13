@@ -14,9 +14,12 @@ type PortalApp struct {
 	// Unique identifier for the PortalApp's account.
 	AccountID AccountID
 
+	// The plan type for the PortalApp's account.
+	PlanType PlanType
+
 	// The authorization settings for the PortalApp.
 	// Auth can be one of:
-	//   - NoAuth: The portal app does not require authorization (Auth will be nil)
+	//   - nil: The portal app does not require authorization
 	//   - APIKey: The portal app uses an API key for authorization
 	Auth *Auth
 
@@ -33,7 +36,6 @@ type Auth struct {
 
 // RateLimit contains rate limiting settings for a PortalApp.
 type RateLimit struct {
-	PlanType         PlanType
 	MonthlyUserLimit int32
 }
 

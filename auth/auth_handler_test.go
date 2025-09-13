@@ -55,10 +55,9 @@ func Test_Check(t *testing.T) {
 			mockPortalAppReturn: &store.PortalApp{
 				ID:        "portal_app_free",
 				AccountID: "account_1",
+				PlanType:  grovedb.PlanFree_DatabaseType,
 				Auth:      nil, // No auth required
-				RateLimit: &store.RateLimit{
-					PlanType: grovedb.PlanFree_DatabaseType,
-				},
+				RateLimit: &store.RateLimit{},
 			},
 		},
 		{
@@ -296,10 +295,9 @@ func Test_Check(t *testing.T) {
 			mockPortalAppReturn: &store.PortalApp{
 				ID:        "portal_app_rate_limited",
 				AccountID: "account_rate_limited",
+				PlanType:  grovedb.PlanFree_DatabaseType,
 				Auth:      nil,
-				RateLimit: &store.RateLimit{
-					PlanType: grovedb.PlanFree_DatabaseType,
-				},
+				RateLimit: &store.RateLimit{},
 			},
 		},
 		{
@@ -331,9 +329,9 @@ func Test_Check(t *testing.T) {
 			mockPortalAppReturn: &store.PortalApp{
 				ID:        "portal_app_unlimited_no_limit",
 				AccountID: "account_unlimited",
+				PlanType:  grovedb.PlanUnlimited_DatabaseType,
 				Auth:      nil,
 				RateLimit: &store.RateLimit{
-					PlanType:         grovedb.PlanUnlimited_DatabaseType,
 					MonthlyUserLimit: 0, // No specific limit
 				},
 			},

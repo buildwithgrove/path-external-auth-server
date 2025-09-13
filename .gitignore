@@ -13,6 +13,7 @@
 
 # Don't commit binaries
 bin
+path-external-auth-server
 
 # Do not allow a multi-moduled projected
 go.work.sum

@@ -41,6 +41,7 @@ func (r *portalApplicationRow) convertToPortalApp() *store.PortalApp {
 	return &store.PortalApp{
 		ID:        store.PortalAppID(r.ID),
 		AccountID: store.AccountID(r.AccountID),
+		PlanType:  store.PlanType(r.Plan),
 		Auth:      r.getAuthDetails(),
 		RateLimit: r.getRateLimitDetails(),
 	}
@@ -62,7 +63,6 @@ func (r *portalApplicationRow) getRateLimitDetails() *store.RateLimit {
 	// 		- PLAN_UNLIMITED with a user-specified monthly user limit
 	if r.Plan == PlanFree_DatabaseType || r.MonthlyUserLimit > 0 {
 		return &store.RateLimit{
-			PlanType:         store.PlanType(r.Plan),
 			MonthlyUserLimit: r.MonthlyUserLimit,
 		}
 	}

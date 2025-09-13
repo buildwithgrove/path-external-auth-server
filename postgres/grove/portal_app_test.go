@@ -21,16 +21,22 @@ func Test_sqlcPortalAppsToProto(t *testing.T) {
 			name: "should convert rows to auth data response successfully",
 			rows: []sqlc.SelectPortalAppsRow{
 				{
-					ID:                "portal_app_1_static_key",
-					AccountID:         pgtype.Text{String: "account_1", Valid: true},
-					Plan:              pgtype.Text{String: "PLAN_UNLIMITED", Valid: true},
+					ID:        "portal_app_1_static_key",
+					AccountID: pgtype.Text{String: "account_1", Valid: true},
+					Plan: pgtype.Text{
+						String: string(PlanUnlimited_DatabaseType),
+						Valid:  true,
+					},
 					SecretKeyRequired: pgtype.Bool{Bool: true, Valid: true},
 					SecretKey:         pgtype.Text{String: "secret_key_1", Valid: true},
 				},
 				{
-					ID:                "portal_app_2_no_auth",
-					AccountID:         pgtype.Text{String: "account_2", Valid: true},
-					Plan:              pgtype.Text{String: "PLAN_FREE", Valid: true},
+					ID:        "portal_app_2_no_auth",
+					AccountID: pgtype.Text{String: "account_2", Valid: true},
+					Plan: pgtype.Text{
+						String: string(PlanFree_DatabaseType),
+						Valid:  true,
+					},
 					SecretKeyRequired: pgtype.Bool{Bool: false, Valid: true},
 					SecretKey:         pgtype.Text{String: "secret_key_2", Valid: true},
 				},
@@ -39,6 +45,7 @@ func Test_sqlcPortalAppsToProto(t *testing.T) {
 				"portal_app_1_static_key": {
 					ID:        "portal_app_1_static_key",
 					AccountID: "account_1",
+					PlanType:  PlanUnlimited_DatabaseType,
 					Auth: &store.Auth{
 						APIKey: "secret_key_1",
 					},
@@ -46,10 +53,9 @@ func Test_sqlcPortalAppsToProto(t *testing.T) {
 				"portal_app_2_no_auth": {
 					ID:        "portal_app_2_no_auth",
 					AccountID: "account_2",
+					PlanType:  PlanFree_DatabaseType,
 					Auth:      nil, // No auth required
-					RateLimit: &store.RateLimit{
-						PlanType: "PLAN_FREE",
-					},
+					RateLimit: &store.RateLimit{},
 				},
 			},
 			wantErr: false,

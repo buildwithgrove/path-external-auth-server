@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	envoy_core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy_auth "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
@@ -17,6 +18,7 @@ import (
 	"google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
 
+	"github.com/buildwithgrove/path-external-auth-server/metrics"
 	"github.com/buildwithgrove/path-external-auth-server/store"
 )
 
@@ -95,15 +97,31 @@ func (a *authHandler) Check(
 	ctx context.Context,
 	checkReq *envoy_auth.CheckRequest,
 ) (*envoy_auth.CheckResponse, error) {
+	startTime := time.Now()
+
 	// Get the HTTP request
 	req := checkReq.GetAttributes().GetRequest().GetHttp()
 	if req == nil {
+		metrics.RecordAuthRequest(
+			"", // portalAppID not available yet
+			"", // accountID not available yet
+			"error",
+			"invalid_request",
+			time.Since(startTime).Seconds(),
+		)
 		return getDeniedCheckResponse("HTTP request not found", envoy_type.StatusCode_BadRequest), nil
 	}
 
 	// Get the request path
 	path := req.GetPath()
 	if path == "" {
+		metrics.RecordAuthRequest(
+			"", // portalAppID not available yet
+			"", // accountID not available yet
+			"error",
+			"invalid_request",
+			time.Since(startTime).Seconds(),
+		)
 		return getDeniedCheckResponse("path not provided", envoy_type.StatusCode_BadRequest), nil
 	}
 
@@ -115,6 +133,13 @@ func (a *authHandler) Check(
 	portalAppID, err := extractPortalAppID(headers, path)
 	if err != nil {
 		a.logger.Debug().Err(err).Msg("🚫 unable to extract portal app ID from request")
+		metrics.RecordAuthRequest(
+			"", // portalAppID not available yet
+			"", // accountID not available yet
+			"error",
+			"invalid_request",
+			time.Since(startTime).Seconds(),
+		)
 		return getDeniedCheckResponse(err.Error(), envoy_type.StatusCode_BadRequest), nil
 	}
 	logger := a.logger.With("portal_app_id", portalAppID)
@@ -126,6 +151,13 @@ func (a *authHandler) Check(
 	portalApp, ok := a.getPortalApp(portalAppID)
 	if !ok {
 		logger.Debug().Msg("🚫 specified portal app not found: rejecting the request.")
+		metrics.RecordAuthRequest(
+			string(portalAppID),
+			"", // accountID not available yet
+			"denied",
+			"portal_app_not_found",
+			time.Since(startTime).Seconds(),
+		)
 		return getDeniedCheckResponse("portal app not found", envoy_type.StatusCode_NotFound), nil
 	}
 	logger = logger.With("account_id", portalApp.AccountID)
@@ -133,18 +165,35 @@ func (a *authHandler) Check(
 	// Check if the Portal Application is authorized
 	if err := a.checkPortalAppAuthorized(headers, portalApp); err != nil {
 		logger.Debug().Err(err).Msg("🚫 request failed authorization: rejecting the request.")
+		metrics.RecordAuthRequest(
+			string(portalAppID),
+			string(portalApp.AccountID),
+			"denied",
+			"unauthorized",
+			time.Since(startTime).Seconds(),
+		)
 		return getDeniedCheckResponse(err.Error(), envoy_type.StatusCode_Unauthorized), nil
 	}
 
 	// Check if the Account is rate limited
 	if err := a.checkAccountRateLimited(portalApp); err != nil {
 		logger.Debug().Msg("🚫 account is rate limited: rejecting the request.")
+		metrics.RecordAuthRequest(
+			string(portalAppID),
+			string(portalApp.AccountID),
+			"denied",
+			"rate_limited",
+			time.Since(startTime).Seconds(),
+		)
 		return getDeniedCheckResponse(accountRateLimitMessage, envoy_type.StatusCode_TooManyRequests), nil
 	}
 
 	// Add Portal Application ID and Account ID to the headers
 	// to be passed upstream along the filter chain to the rate limiter.
 	httpHeaders := a.getHTTPHeaders(portalApp)
+
+	// Record successful authorization
+	metrics.RecordAuthRequest(string(portalAppID), string(portalApp.AccountID), "authorized", "", time.Since(startTime).Seconds())
 
 	// Return a valid response with the HTTP headers set
 	return getOKCheckResponse(httpHeaders), nil
@@ -172,9 +221,12 @@ func (a *authHandler) getPortalApp(portalAppID store.PortalAppID) (*store.Portal
 //   - Returns nil if no authorization is required (Auth is nil or APIKey is empty)
 //   - Otherwise, performs API Key authorization
 func (a *authHandler) checkPortalAppAuthorized(headers http.Header, portalApp *store.PortalApp) error {
+	// If portalApp.Auth is nil, no authorization is required.
 	if portalApp.Auth == nil || portalApp.Auth.APIKey == "" {
 		return nil
 	}
+
+	// Otherwise, perform API Key authorization
 	return a.apiKeyAuthorizer.authorizeRequest(headers, portalApp)
 }
 
@@ -183,11 +235,17 @@ func (a *authHandler) checkPortalAppAuthorized(headers http.Header, portalApp *s
 //   - Returns an error if the account is rate limited.
 func (a *authHandler) checkAccountRateLimited(portalApp *store.PortalApp) error {
 	if portalApp.RateLimit == nil {
+		metrics.RecordRateLimitCheck(string(portalApp.AccountID), "", "no_limit_configured")
 		return nil
 	}
+
+	planType := string(portalApp.PlanType)
 	if a.rateLimitStore.IsAccountRateLimited(portalApp.AccountID) {
+		metrics.RecordRateLimitCheck(string(portalApp.AccountID), planType, "rate_limited")
 		return fmt.Errorf("account is rate limited")
 	}
+
+	metrics.RecordRateLimitCheck(string(portalApp.AccountID), planType, "allowed")
 	return nil
 }
 
