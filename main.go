@@ -78,13 +78,13 @@ func main() {
 	}
 	logger.Info().Msg("✅ Successfully initialized rate limit store")
 
-	// Setup and start Prometheus metrics server (includes /healthz endpoint)
+	// Setup and start observability servers
+	// TODO_MONITORING: Consider adding graceful shutdown for metrics and pprof servers
 	metricsAddr := fmt.Sprintf(":%d", env.metricsPort)
 	if err := setupMetricsServer(logger, metricsAddr, env.imageTag); err != nil {
 		panic(fmt.Sprintf("failed to start metrics server: %v", err))
 	}
 
-	// Setup and start pprof server
 	pprofAddr := fmt.Sprintf(":%d", env.pprofPort)
 	setupPprofServer(ctx, logger, pprofAddr)
 

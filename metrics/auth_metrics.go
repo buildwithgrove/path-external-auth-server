@@ -7,6 +7,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// TODO_TESTING: Add comprehensive unit tests for metrics recording functions
+// TODO_PERFORMANCE: Consider implementing metric batching for high-volume scenarios
+// TODO_MONITORING: Add metric validation to ensure label values are within expected ranges
+
 // See the metrics initialization below for details.
 const (
 	// The POSIX process that emits metrics
@@ -73,7 +77,10 @@ var (
 			Name:      authRequestDurationSecondsMetricName,
 			Help:      "Histogram of authorization request processing time in seconds",
 			// Buckets optimized for very fast in-memory operations (100ns to 10ms)
-			Buckets: []float64{0.0000001, 0.0000005, 0.000001, 0.000005, 0.00001, 0.00005, 0.0001, 0.0005, 0.001, 0.005, 0.01},
+			Buckets: []float64{
+				0.0000001, 0.0000005, 0.000001, 0.000005, 0.00001,
+				0.00005, 0.0001, 0.0005, 0.001, 0.005, 0.01,
+			},
 		},
 		[]string{"portal_app_id", "status"},
 	)

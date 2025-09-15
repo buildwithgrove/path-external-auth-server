@@ -65,13 +65,20 @@ var postgresConnectionStringRegex = regexp.MustCompile(`^postgres(?:ql)?:\/\/[^:
 //   - All fields are private.
 //   - Use gatherEnvVars to load, validate, and hydrate defaults from environment variables.
 type envVars struct {
-	postgresConnectionString      string
-	gcpProjectID                  string
-	port                          int
-	metricsPort                   int
-	pprofPort                     int
-	loggerLevel                   string
-	imageTag                      string
+	// Database and external service configuration
+	postgresConnectionString string
+	gcpProjectID             string
+
+	// Server port configuration
+	port        int
+	metricsPort int
+	pprofPort   int
+
+	// Application configuration
+	loggerLevel string
+	imageTag    string
+
+	// Store refresh intervals
 	portalAppStoreRefreshInterval time.Duration
 	rateLimitStoreRefreshInterval time.Duration
 }

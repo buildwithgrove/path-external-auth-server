@@ -221,7 +221,7 @@ func (a *authHandler) getPortalApp(portalAppID store.PortalAppID) (*store.Portal
 //   - Returns nil if no authorization is required (Auth is nil or APIKey is empty)
 //   - Otherwise, performs API Key authorization
 func (a *authHandler) checkPortalAppAuthorized(headers http.Header, portalApp *store.PortalApp) error {
-	// If portalApp.Auth is nil, no authorization is required.
+	// If portalApp.Auth is nil, no authorization is required
 	if portalApp.Auth == nil || portalApp.Auth.APIKey == "" {
 		return nil
 	}
@@ -234,17 +234,20 @@ func (a *authHandler) checkPortalAppAuthorized(headers http.Header, portalApp *s
 //   - Returns nil if the account is not eligible for rate limiting.
 //   - Returns an error if the account is rate limited.
 func (a *authHandler) checkAccountRateLimited(portalApp *store.PortalApp) error {
+	// If no rate limit is configured for this portal app, allow the request
 	if portalApp.RateLimit == nil {
 		metrics.RecordRateLimitCheck(string(portalApp.AccountID), "", "no_limit_configured")
 		return nil
 	}
 
+	// Check if the account has exceeded their rate limit
 	planType := string(portalApp.PlanType)
 	if a.rateLimitStore.IsAccountRateLimited(portalApp.AccountID) {
 		metrics.RecordRateLimitCheck(string(portalApp.AccountID), planType, "rate_limited")
 		return fmt.Errorf("account is rate limited")
 	}
 
+	// Account is within rate limits, allow the request
 	metrics.RecordRateLimitCheck(string(portalApp.AccountID), planType, "allowed")
 	return nil
 }
