@@ -109,7 +109,7 @@ func (rls *rateLimitStore) updateRateLimitedAccounts() error {
 		FreeMonthlyRelays,
 	)
 	if err != nil {
-		metrics.RecordDataSourceRefreshError("rate_limit_store", "bigquery_error")
+		metrics.RecordDataSourceRefreshError(metrics.RateLimitStoreSourceType, metrics.BigqueryErrorType)
 		return fmt.Errorf("failed to get monthly usage data: %w", err)
 	}
 
@@ -122,13 +122,22 @@ func (rls *rateLimitStore) updateRateLimitedAccounts() error {
 		// Get the account's portal app
 		portalApp, exists := rls.accountPortalAppStore.GetAccountPortalApp(accountID)
 		if !exists {
-			// Skip accounts without rate limit configuration
+			rls.logger.Error().
+				Str("account_id", string(accountID)).
+				Msg("⁉️ SHOULD NEVER HAPPEN: Skipping account without portal app")
 			continue
 		}
 
 		// Get the account's rate limit
 		// Will return 0 if no rate limit is configured
 		rateLimit := rls.getRateLimit(portalApp)
+		if rateLimit == 0 {
+			rls.logger.Debug().
+				Str("account_id", string(accountID)).
+				Str("plan_type", string(portalApp.PlanType)).
+				Msg("✅ Skipping account with no rate limit configured")
+			continue
+		}
 
 		// Update account usage metrics for accounts over monthly limit
 		planType := string(portalApp.PlanType)
@@ -139,11 +148,12 @@ func (rls *rateLimitStore) updateRateLimitedAccounts() error {
 		if shouldLimit {
 			newRateLimitedAccounts[accountID] = true
 			metrics.UpdateRateLimitedAccounts(string(accountID), planType, float64(usage), rateLimit)
-			rls.logger.Debug().
+			rls.logger.Info().
 				Str("account_id", string(accountID)).
-				Str("plan_type", string(portalApp.PlanType)).
+				Str("plan_type", planType).
 				Int64("usage", usage).
-				Msg("🚫 Account rate limited")
+				Int32("rate_limit", rateLimit).
+				Msg("🤚 Account rate limited")
 		}
 	}
 
@@ -175,6 +185,7 @@ func (rls *rateLimitStore) getRateLimit(portalApp *store.PortalApp) int32 {
 	case grovedb.PlanFree_DatabaseType:
 		// For free plan, return the free tier limit
 		return FreeMonthlyRelays
+
 	case grovedb.PlanUnlimited_DatabaseType:
 		// For unlimited plan, check against the account's specific monthly limit (if set)
 		if portalApp.RateLimit.MonthlyUserLimit > 0 {
@@ -182,6 +193,7 @@ func (rls *rateLimitStore) getRateLimit(portalApp *store.PortalApp) int32 {
 		}
 		// If no limit is set for unlimited plan, don't rate limit
 		return 0
+
 	default:
 		return 0
 	}
@@ -198,6 +210,6 @@ func (rls *rateLimitStore) shouldLimitAccount(rateLimit int32, usage int64) bool
 
 // updateStoreMetrics updates the Prometheus metrics for rate limit store sizes.
 func (rls *rateLimitStore) updateStoreMetrics(accountsOverLimit, rateLimitedAccounts int) {
-	metrics.UpdateStoreSize("accounts_over_monthly_limit", float64(accountsOverLimit))
-	metrics.UpdateStoreSize("rate_limited_accounts", float64(rateLimitedAccounts))
+	metrics.UpdateStoreSize(metrics.AccountsOverMonthlyLimitStoreType, float64(accountsOverLimit))
+	metrics.UpdateStoreSize(metrics.RateLimitedAccountsStoreType, float64(rateLimitedAccounts))
 }

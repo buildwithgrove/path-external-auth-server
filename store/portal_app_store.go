@@ -23,13 +23,11 @@ type portalAppStore struct {
 	dataSource DataSource
 
 	// In-memory map of portal apps (portalAppID -> *PortalApp)
-	portalApps map[PortalAppID]*PortalApp
-	// Mutex to protect access to portalApps
+	portalApps   map[PortalAppID]*PortalApp
 	portalAppsMu sync.RWMutex
 
 	// In-memory map of account portal apps for rate limiting (accountID -> PortalApp)
-	accountPortalApps map[AccountID]*PortalApp
-	// Mutex to protect access to accountPortalApps
+	accountPortalApps   map[AccountID]*PortalApp
 	accountPortalAppsMu sync.RWMutex
 }
 
@@ -95,7 +93,7 @@ func (c *portalAppStore) initializeStore() error {
 
 	err := c.setStoreData()
 	if err != nil {
-		metrics.RecordDataSourceRefreshError("portal_app_store", "postgres_error")
+		metrics.RecordDataSourceRefreshError(metrics.PortalAppStoreSourceType, metrics.PostgresErrorType)
 		return fmt.Errorf("failed to set initial store data: %w", err)
 	}
 
@@ -131,7 +129,7 @@ func (c *portalAppStore) refreshStore() error {
 
 	err := c.setStoreData()
 	if err != nil {
-		metrics.RecordDataSourceRefreshError("portal_app_store", "postgres_error")
+		metrics.RecordDataSourceRefreshError(metrics.PortalAppStoreSourceType, metrics.PostgresErrorType)
 		return fmt.Errorf("failed to refresh store data: %w", err)
 	}
 
@@ -159,7 +157,7 @@ func (c *portalAppStore) setStoreData() error {
 	c.portalApps = portalApps
 	c.portalAppsMu.Unlock()
 
-	c.setAccountRateLimits(portalApps)
+	c.setPortalAppsByAccountID(portalApps)
 
 	return nil
 }
@@ -175,13 +173,15 @@ func (c *portalAppStore) updateStoreMetrics() {
 	c.accountPortalAppsMu.RUnlock()
 
 	// Update store size metrics
-	metrics.UpdateStoreSize("portal_apps", float64(portalAppCount))
-	metrics.UpdateStoreSize("accounts", float64(accountCount))
+	metrics.UpdateStoreSize(metrics.PortalAppsStoreType, float64(portalAppCount))
+	metrics.UpdateStoreSize(metrics.AccountsStoreType, float64(accountCount))
 }
 
-// setAccountRateLimits extracts and caches account rate limits from portal apps.
+// setPortalAppsByAccountID stores portal apps by account ID.
+// This i required because rate limits are applied at the account level, not the portal app level.
+//
 // Only sets account data if it's not already set for the same account ID to avoid unnecessary updates.
-func (c *portalAppStore) setAccountRateLimits(portalApps map[PortalAppID]*PortalApp) {
+func (c *portalAppStore) setPortalAppsByAccountID(portalApps map[PortalAppID]*PortalApp) {
 	c.accountPortalAppsMu.Lock()
 	defer c.accountPortalAppsMu.Unlock()
 

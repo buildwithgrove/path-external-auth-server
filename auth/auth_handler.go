@@ -193,7 +193,13 @@ func (a *authHandler) Check(
 	httpHeaders := a.getHTTPHeaders(portalApp)
 
 	// Record successful authorization
-	metrics.RecordAuthRequest(string(portalAppID), string(portalApp.AccountID), "authorized", "", time.Since(startTime).Seconds())
+	metrics.RecordAuthRequest(
+		string(portalAppID),
+		string(portalApp.AccountID),
+		"authorized",
+		"",
+		time.Since(startTime).Seconds(),
+	)
 
 	// Return a valid response with the HTTP headers set
 	return getOKCheckResponse(httpHeaders), nil
@@ -221,7 +227,8 @@ func (a *authHandler) getPortalApp(portalAppID store.PortalAppID) (*store.Portal
 //   - Returns nil if no authorization is required (Auth is nil or APIKey is empty)
 //   - Otherwise, performs API Key authorization
 func (a *authHandler) checkPortalAppAuthorized(headers http.Header, portalApp *store.PortalApp) error {
-	// If portalApp.Auth is nil, no authorization is required
+	// If portal app does not require API key authorization, portalApp.Auth will be nil
+	// and no authorization will be performed by PEAS
 	if portalApp.Auth == nil || portalApp.Auth.APIKey == "" {
 		return nil
 	}

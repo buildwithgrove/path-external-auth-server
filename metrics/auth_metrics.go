@@ -31,6 +31,20 @@ const (
 
 	// Data source refresh error tracking
 	dataSourceRefreshErrorsTotalMetricName = "data_source_refresh_errors_total"
+
+	// Source type constants for data source refresh errors
+	PortalAppStoreSourceType = "portal_app_store"
+	RateLimitStoreSourceType = "rate_limit_store"
+
+	// Error type constants for data source refresh errors
+	PostgresErrorType = "postgres_error"
+	BigqueryErrorType = "bigquery_error"
+
+	// Store type constants for store size metrics
+	PortalAppsStoreType               = "portal_apps"
+	AccountsStoreType                 = "accounts"
+	RateLimitedAccountsStoreType      = "rate_limited_accounts"
+	AccountsOverMonthlyLimitStoreType = "accounts_over_monthly_limit"
 )
 
 func init() {
