@@ -7,45 +7,76 @@
 <br/>
 
 - [Introduction](#introduction)
+- [PEAS Responsibilities](#peas-responsibilities)
+  - [Authenticating Requests](#authenticating-requests)
+  - [Assigning Rate Limiting Headers](#assigning-rate-limiting-headers)
   - [Docker Image](#docker-image)
   - [Architecture Diagram](#architecture-diagram)
   - [`PortalApp` Structure](#portalapp-structure)
 - [Request Headers](#request-headers)
 - [Rate Limiting Implementation](#rate-limiting-implementation)
+  - [How does Rate Limiting Work?](#how-does-rate-limiting-work)
+  - [Rate Limit Store Refresh](#rate-limit-store-refresh)
 - [Portal App Store Refresh](#portal-app-store-refresh)
-  - [How It Works](#how-it-works)
+  - [How does Portal App Store Refresh Work?](#how-does-portal-app-store-refresh-work)
   - [Configuration](#configuration)
 - [Envoy Gateway Integration](#envoy-gateway-integration)
+- [Prometheus Metrics](#prometheus-metrics)
+  - [Key Metrics](#key-metrics)
+  - [Endpoints](#endpoints)
 - [Getting Portal App Auth \& Rate Limit Status](#getting-portal-app-auth--rate-limit-status)
   - [Prerequisites](#prerequisites)
   - [Usage](#usage)
   - [Example Output](#example-output)
 - [PEAS Environment Variables](#peas-environment-variables)
+- [Developing Metrics Dashboard Locally](#developing-metrics-dashboard-locally)
+  - [Stack Components](#stack-components)
+  - [Prerequisites](#prerequisites-1)
+  - [Quick Start](#quick-start)
+  - [Local Testing](#local-testing)
+    - [Test the health endpoint:](#test-the-health-endpoint)
+    - [Test the metrics endpoint:](#test-the-metrics-endpoint)
+    - [Generate some test traffic:](#generate-some-test-traffic)
+    - [Load Testing](#load-testing)
+  - [Cleanup](#cleanup)
+  - [Dashboard](#dashboard)
+    - [Dashboard Screenshot](#dashboard-screenshot)
+    - [Importing Dashboard to Production Grafana](#importing-dashboard-to-production-grafana)
 
 ## Introduction
 
-**PEAS** (PATH External Auth Server) is an external authorization server that can be used to authorize requests to the [PATH Gateway](https://github.com/buildwithgrove/path). 
+**PEAS** (PATH External Auth Server) is an external authorization server that can
+be used to authorize requests to the [PATH Gateway](https://github.com/buildwithgrove/path).
 
 It is part of the GUARD authorization system for PATH and runs in the PATH Kubernetes cluster.
 
-It has the following two responsibilities:
+## PEAS Responsibilities
 
-1. Authenticating Requests
-   - Determines if requests to GUARD are authorized
-   - If the request is authorized, the request is forwarded upstream
-2. Assigning Rate Limiting Headers
-   - Assigns rate limiting headers to requests to GUARD
-   - These headers are forwarded to the upstream Envoy rate limit service
-  
+PEAS has the following two responsibilities:
+
+### Authenticating Requests
+
+**Is request to GUARD authorized?**
+
+- If authorized, forward the request upstream
+- If not authorized, return an error
+
+### Assigning Rate Limiting Headers
+
+**Is request to GUARD rate limited?**
+
+- If rate limited, forward the request upstream with rate limiting headers
+- If not rate limited, forward the request upstream without rate limiting headers
+
 Data for authentication and rate limiting is sourced from the Grove Portal Database. For more information about the Grove Portal Database, see the [Grove Portal Database README](./postgres/grove/README.md).
 
 ### Docker Image
 
+[PEAS GHCR Package](https://github.com/orgs/buildwithgrove/packages/container/package/path-external-auth-server)
+
 ```bash
 docker pull ghcr.io/buildwithgrove/path-external-auth-server:latest
 ```
-
-- [PEAS GHCR Package](https://github.com/orgs/buildwithgrove/packages/container/package/path-external-auth-server)
 
 ### Architecture Diagram
 
@@ -87,31 +118,38 @@ See `PortalApp` structure [here](https://github.com/buildwithgrove/path-external
 
 PEAS adds the following headers to authorized requests before forwarding them to the upstream service:
 
-| Header                  | Contents                                                                               | Included For All Requests                                            | Example Value |
-| ----------------------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------- |
-| `Portal-Application-ID` | The portal app ID of the authorized portal app                                         | ✅                                                                    | "a12b3c4d"    |
-| `Portal-Account-ID`     | The account ID associated with the portal app                                          | ✅                                                                    | "3f4g2js2"    |
-| `Rl-Plan-Free`          | The account ID for rate limiting purposes (PLAN_FREE)                                  | ❌ (Only for `PLAN_FREE` portal apps)                                 | "3f4g2js2"    |
-| `Rl-User-Limit-<X>`     | The account ID for rate limiting purposes with a user limit _(X = relays in millions)_ | ❌ (Only for `PLAN_UNLIMITED` portal apps with user-specified limits) | "3f4g2js2"    |
+| Header                  | Contents                                       | Included For All Requests | Example Value |
+| ----------------------- | ---------------------------------------------- | ------------------------- | ------------- |
+| `Portal-Application-ID` | The portal app ID of the authorized portal app | ✅                        | "a12b3c4d"    |
+| `Portal-Account-ID`     | The account ID associated with the portal app  | ✅                        | "3f4g2js2"    |
 
 ## Rate Limiting Implementation
 
-PEAS provides rate limiting capabilities through the following mechanisms:
+PEAS provides rate limiting capabilities through an in-memory rate limit store that tracks account usage and enforces monthly limits:
 
-1. **Plan-Based Rate Limiting**: For `PLAN_FREE` portal apps, PEAS will add headers like `Rl-Plan-Free: <account-id>`.
+### How does Rate Limiting Work?
 
-2. **User-Based Rate Limiting**: For `PLAN_UNLIMITED` portal apps with user-specified monthly limits, PEAS adds headers based on the limit in millions:
-   - 10 million monthly user limit: `Rl-User-Limit-10: <account-id>`
-   - 40 million monthly user limit: `Rl-User-Limit-40: <account-id>`
-   - etc..
+1. **Rate Limit Store**: Maintains an in-memory map of rate limited accounts, refreshed periodically from BigQuery data warehouse
+2. **Monthly Usage Tracking**: Monitors account usage against their monthly relay limits based on plan type
+3. **Plan-Based Limits**:
+   - **Free Plan (`PLAN_FREE`)**: 1,000,000 relays per month
+   - **Unlimited Plan (`PLAN_UNLIMITED`)**: Custom limits set per account, or unlimited if no limit specified
+4. **Real-time Enforcement**: Blocks requests from accounts that exceed their monthly limits
 
-These headers are processed by the Envoy rate limiter configured in the GUARD system, allowing for granular control over request rates.
+### Rate Limit Store Refresh
+
+The rate limit store automatically refreshes from the data warehouse to update account usage:
+
+- **Default Refresh Interval**: 5 minutes
+- **Data Source**: BigQuery data warehouse for monthly usage statistics
+- **Configuration**: `RATE_LIMIT_STORE_REFRESH_INTERVAL` environment variable
+- **Monitoring**: Refresh operations are logged and metrics are available via Prometheus
 
 ## Portal App Store Refresh
 
 PEAS maintains an in-memory store of portal app data for fast authorization lookups. This store is automatically refreshed from the Grove Portal Database on a configurable interval.
 
-### How It Works
+### How does Portal App Store Refresh Work?
 
 1. **Initial Load**: On startup, PEAS fetches all portal app data from the database to populate the in-memory store
 2. **Background Refresh**: A background goroutine periodically refreshes the store by fetching the latest data from the database
@@ -141,6 +179,24 @@ For more information see:
 - [Envoy Gateway External Authorization Docs](https://gateway.envoyproxy.io/docs/tasks/security/ext-auth/)
 - [Envoy Proxy `ext_authz` HTTP Filter Docs](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter)
 
+## Prometheus Metrics
+
+PEAS exposes Prometheus metrics on the `/metrics` endpoint for monitoring authorization performance, rate limiting, and system health.
+
+### Key Metrics
+
+- **Authorization Metrics**: Request counts, success rates, and response times
+- **Rate Limiting Metrics**: Account usage, rate limit decisions, and store sizes
+- **System Health**: Data source refresh errors and store performance
+
+### Endpoints
+
+- `/metrics` - Prometheus metrics endpoint (port `9090` by default)
+- `/healthz` - Health check endpoint
+- `/debug/pprof/` - Runtime profiling (port `6060` by default)
+
+A comprehensive Grafana dashboard is available at `grafana/dashboard.json` for visualizing all metrics.
+
 ## Getting Portal App Auth & Rate Limit Status
 
 PEAS includes a convenient Makefile target for testing authorization and rate limit status for Portal Apps during development.
@@ -157,13 +213,14 @@ PEAS includes a convenient Makefile target for testing authorization and rate li
 # Test without API key (for apps that don't require authentication)
 make get_portal_app_auth_status PORTAL_APP_ID=1a2b3c4d
 
-# Test with API key (for apps that require authentication)  
+# Test with API key (for apps that require authentication)
 make get_portal_app_auth_status PORTAL_APP_ID=1a2b3c4d API_KEY=4c352139ec5ca9288126300271d08867
 ```
 
 ### Example Output
 
 **Successful Authorization:**
+
 ```json
 {
   "status": {
@@ -179,7 +236,7 @@ make get_portal_app_auth_status PORTAL_APP_ID=1a2b3c4d API_KEY=4c352139ec5ca9288
       },
       {
         "header": {
-          "key": "Portal-Account-ID", 
+          "key": "Portal-Account-ID",
           "value": "d4c3b2a1"
         }
       }
@@ -189,6 +246,7 @@ make get_portal_app_auth_status PORTAL_APP_ID=1a2b3c4d API_KEY=4c352139ec5ca9288
 ```
 
 **Failed Authorization:**
+
 ```json
 {
   "status": {
@@ -205,17 +263,18 @@ make get_portal_app_auth_status PORTAL_APP_ID=1a2b3c4d API_KEY=4c352139ec5ca9288
 ```
 
 **Failed Rate Limit Check:**
+
 ```json
 {
   "status": {
     "code": 7,
-    "message": "account is rate limited"
+    "message": "This account is rate limited. To upgrade your plan or modify your account settings, log in to your account at https://portal.grove.city/"
   },
   "deniedResponse": {
     "status": {
       "code": "TooManyRequests"
     },
-    "body": "{\"code\": 429, \"message\": \"account is rate limited\"}"
+    "body": "{\"code\": 429, \"message\": \"This account is rate limited. To upgrade your plan or modify your account settings, log in to your account at https://portal.grove.city/\"}"
   }
 }
 ```
@@ -226,9 +285,111 @@ This tool uses gRPC reflection to communicate with PEAS, testing the same author
 
 PEAS is configured via environment variables.
 
-| Variable                   | Required | Type     | Description                                                           | Example                                              | Default Value |
-| -------------------------- | -------- | -------- | --------------------------------------------------------------------- | ---------------------------------------------------- | ------------- |
-| POSTGRES_CONNECTION_STRING | ✅        | string   | The PostgreSQL connection string for the database with PortalApp data | postgresql://username:password@localhost:5432/dbname | -             |
-| PORT                       | ❌        | int      | The port to run the external auth server on                           | 10001                                                | 10001         |
-| LOGGER_LEVEL               | ❌        | string   | The log level to use for the external auth server                     | info                                                 | info          |
-| REFRESH_INTERVAL           | ❌        | duration | The interval for refreshing portal app data from the database         | 30s, 1m, 2m30s                                       | 30s           |
+| Variable                          | Required | Type     | Description                                                  | Example                                              | Default Value |
+| --------------------------------- | -------- | -------- | ------------------------------------------------------------ | ---------------------------------------------------- | ------------- |
+| POSTGRES_CONNECTION_STRING        | ✅       | string   | PostgreSQL connection string for the PortalApp database      | postgresql://username:password@localhost:5432/dbname | -             |
+| GCP_PROJECT_ID                    | ✅       | string   | GCP project ID for the data warehouse used by rate limiting  | your-project-id                                      | -             |
+| PORT                              | ❌       | int      | Port to run the external auth server on                      | 10001                                                | 10001         |
+| METRICS_PORT                      | ❌       | int      | Port to run the Prometheus metrics server on                 | 9090                                                 | 9090          |
+| PPROF_PORT                        | ❌       | int      | Port to run the pprof server on                              | 6060                                                 | 6060          |
+| LOGGER_LEVEL                      | ❌       | string   | Log level for the external auth server                       | info, debug, warn, error                             | info          |
+| IMAGE_TAG                         | ❌       | string   | Image tag/version for the application                        | v1.0.0                                               | development   |
+| PORTAL_APP_STORE_REFRESH_INTERVAL | ❌       | duration | Refresh interval for portal app data from the database       | 30s, 1m, 2m30s                                       | 30s           |
+| RATE_LIMIT_STORE_REFRESH_INTERVAL | ❌       | duration | Refresh interval for rate limit data from the data warehouse | 30s, 1m, 2m30s                                       | 5m            |
+
+## Developing Metrics Dashboard Locally
+
+This section describes how to run and test the PEAS metrics dashboard locally using Docker Compose, Prometheus, and Grafana.
+
+### Stack Components
+
+- **Prometheus**: Metrics collection from locally running PEAS
+- **Grafana**: Dashboard visualization using the PEAS dashboard
+
+### Prerequisites
+
+- **PEAS running locally**: Run PEAS directly on your machine (not in Docker)
+- Create a `.env` file in the parent directory (`../`) with your database credentials and configuration
+- Ensure you have access to your remote PostgreSQL and GCP BigQuery instances
+
+### Quick Start
+
+1. **Start the monitoring stack**:
+   ```bash
+   cd grafana/local
+   docker compose up -d
+   ```
+2. **Start PEAS locally** (in another terminal, from repo root):
+   ```bash
+   go run .
+   ```
+3. **Access the services**:
+   - **PEAS gRPC Server**: `localhost:10001`
+   - **PEAS Metrics**: `http://localhost:9090/metrics`
+   - **PEAS Health**: `http://localhost:9090/healthz`
+   - **PEAS pprof**: `http://localhost:6060/debug/pprof/`
+   - **Prometheus**: `http://localhost:9091`
+   - **Grafana**: `http://localhost:3000` (admin/admin)
+4. **View the dashboard**:
+   - Go to Grafana at `http://localhost:3000`
+   - Login with admin/admin
+   - The PEAS dashboard should be automatically loaded
+
+### Local Testing
+
+#### Test the health endpoint:
+
+```bash
+curl http://localhost:9090/healthz | jq
+```
+
+#### Test the metrics endpoint:
+
+```bash
+curl http://localhost:9090/metrics | grep peas_
+```
+
+#### Generate some test traffic:
+
+Since PEAS is a gRPC server, you can use grpcurl to send test requests:
+
+```bash
+# Install grpcurl if needed
+go install github.com/fullstorydev/grpcurl/cmd/grpcurl@latest
+# Test authorization request (will likely fail but generate metrics)
+grpcurl -plaintext localhost:10001 envoy.service.auth.v3.Authorization/Check
+```
+
+#### Load Testing
+
+You can run a load test using the provided script:
+
+```bash
+make load-test
+```
+
+Or with custom parameters:
+
+```bash
+make load-test-custom TOTAL_REQUESTS=5000 SUCCESS_RATE=80
+```
+
+### Cleanup
+
+```bash
+docker compose down -v  # Removes containers and volumes
+```
+
+### Dashboard
+
+The PEAS dashboard is automatically provisioned in Grafana when running the observability stack locally for development purposes.
+
+For production deployments, you can import the dashboard manually.
+
+#### Dashboard Screenshot
+
+![Dashboard Screenshot](./.github/dashboard.png)
+
+#### Importing Dashboard to Production Grafana
+
+To import the PEAS dashboard into your production Grafana instance follow the documentation on the [Grafana documentation](https://grafana.com/docs/grafana/latest/dashboards/build-dashboards/import-dashboards/).

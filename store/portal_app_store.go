@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/pokt-network/poktroll/pkg/polylog"
+
+	"github.com/buildwithgrove/path-external-auth-server/metrics"
 )
 
 // portalAppStore is an in-memory store for portal apps and their associated data.
@@ -21,16 +23,12 @@ type portalAppStore struct {
 	dataSource DataSource
 
 	// In-memory map of portal apps (portalAppID -> *PortalApp)
-	portalApps map[PortalAppID]*PortalApp
-
-	// In-memory map of account rate limits (accountID -> RateLimit)
-	accountRateLimits map[AccountID]RateLimit
-
-	// Mutex to protect access to portalApps
+	portalApps   map[PortalAppID]*PortalApp
 	portalAppsMu sync.RWMutex
 
-	// Mutex to protect access to accountRateLimits
-	accountRateLimitsMu sync.RWMutex
+	// In-memory map of account portal apps for rate limiting (accountID -> PortalApp)
+	accountPortalApps   map[AccountID]*PortalApp
+	accountPortalAppsMu sync.RWMutex
 }
 
 // NewPortalAppStore creates a new in-memory portal app store.
@@ -48,7 +46,7 @@ func NewPortalAppStore(
 		logger:            logger.With("component", "portal_app_data_store"),
 		dataSource:        dataSource,
 		portalApps:        make(map[PortalAppID]*PortalApp),
-		accountRateLimits: make(map[AccountID]RateLimit),
+		accountPortalApps: make(map[AccountID]*PortalApp),
 	}
 
 	// Fetch initial data from the data source and populate the store
@@ -76,17 +74,17 @@ func (c *portalAppStore) GetPortalApp(portalAppID PortalAppID) (*PortalApp, bool
 	return portalApp, ok
 }
 
-// GetAccountRateLimit retrieves a RateLimit from the store by its account ID.
+// GetAccountPortalApp retrieves a PortalApp from the store by its account ID.
 //
 // Returns:
-// - The RateLimit pointer if found
-// - A bool indicating if the RateLimit exists in the store
-func (c *portalAppStore) GetAccountRateLimit(accountID AccountID) (RateLimit, bool) {
-	c.accountRateLimitsMu.RLock()
-	defer c.accountRateLimitsMu.RUnlock()
+// - The PortalApp pointer if found
+// - A bool indicating if the PortalApp exists in the store
+func (c *portalAppStore) GetAccountPortalApp(accountID AccountID) (*PortalApp, bool) {
+	c.accountPortalAppsMu.RLock()
+	defer c.accountPortalAppsMu.RUnlock()
 
-	rateLimit, ok := c.accountRateLimits[accountID]
-	return rateLimit, ok
+	portalApp, ok := c.accountPortalApps[accountID]
+	return portalApp, ok
 }
 
 // initializeStore fetches the initial set of PortalApps from the data source and populates the in-memory store.
@@ -95,8 +93,12 @@ func (c *portalAppStore) initializeStore() error {
 
 	err := c.setStoreData()
 	if err != nil {
+		metrics.RecordDataSourceRefreshError(metrics.PortalAppStoreSourceType, metrics.PostgresErrorType)
 		return fmt.Errorf("failed to set initial store data: %w", err)
 	}
+
+	// Update initial store size metrics
+	c.updateStoreMetrics()
 
 	c.logger.Info().Msg("🌱 Successfully fetched initial data from data source")
 	return nil
@@ -127,6 +129,7 @@ func (c *portalAppStore) refreshStore() error {
 
 	err := c.setStoreData()
 	if err != nil {
+		metrics.RecordDataSourceRefreshError(metrics.PortalAppStoreSourceType, metrics.PostgresErrorType)
 		return fmt.Errorf("failed to refresh store data: %w", err)
 	}
 
@@ -135,6 +138,9 @@ func (c *portalAppStore) refreshStore() error {
 		Int("portal_app_count", len(c.portalApps)).
 		Int64("refresh_duration_ms", refreshDuration.Milliseconds()).
 		Msg("🌿 Successfully refreshed portal apps from data source")
+
+	// Update store size metrics
+	c.updateStoreMetrics()
 
 	return nil
 }
@@ -151,26 +157,38 @@ func (c *portalAppStore) setStoreData() error {
 	c.portalApps = portalApps
 	c.portalAppsMu.Unlock()
 
-	c.setAccountRateLimits(portalApps)
+	c.setPortalAppsByAccountID(portalApps)
 
 	return nil
 }
 
-// setAccountRateLimits extracts and caches account rate limits from portal apps.
+// updateStoreMetrics updates the Prometheus metrics for store sizes.
+func (c *portalAppStore) updateStoreMetrics() {
+	c.portalAppsMu.RLock()
+	portalAppCount := len(c.portalApps)
+	c.portalAppsMu.RUnlock()
+
+	c.accountPortalAppsMu.RLock()
+	accountCount := len(c.accountPortalApps)
+	c.accountPortalAppsMu.RUnlock()
+
+	// Update store size metrics
+	metrics.UpdateStoreSize(metrics.PortalAppsStoreType, float64(portalAppCount))
+	metrics.UpdateStoreSize(metrics.AccountsStoreType, float64(accountCount))
+}
+
+// setPortalAppsByAccountID stores portal apps by account ID.
+// This i required because rate limits are applied at the account level, not the portal app level.
+//
 // Only sets account data if it's not already set for the same account ID to avoid unnecessary updates.
-func (c *portalAppStore) setAccountRateLimits(portalApps map[PortalAppID]*PortalApp) {
-	c.accountRateLimitsMu.Lock()
-	defer c.accountRateLimitsMu.Unlock()
+func (c *portalAppStore) setPortalAppsByAccountID(portalApps map[PortalAppID]*PortalApp) {
+	c.accountPortalAppsMu.Lock()
+	defer c.accountPortalAppsMu.Unlock()
 
 	for _, portalApp := range portalApps {
-		// Skip if portal app has no rate limit configured
-		if portalApp.RateLimit == nil {
-			continue
-		}
-
 		// Only set if not already present for this account ID
-		if _, exists := c.accountRateLimits[portalApp.AccountID]; !exists {
-			c.accountRateLimits[portalApp.AccountID] = *portalApp.RateLimit
+		if _, exists := c.accountPortalApps[portalApp.AccountID]; !exists {
+			c.accountPortalApps[portalApp.AccountID] = portalApp
 		}
 	}
 }

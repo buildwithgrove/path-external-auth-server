@@ -13,6 +13,7 @@ import (
 
 	"github.com/buildwithgrove/path-external-auth-server/auth"
 	"github.com/buildwithgrove/path-external-auth-server/dwh"
+	"github.com/buildwithgrove/path-external-auth-server/metrics"
 	"github.com/buildwithgrove/path-external-auth-server/postgres/grove"
 	"github.com/buildwithgrove/path-external-auth-server/ratelimit"
 	"github.com/buildwithgrove/path-external-auth-server/store"
@@ -33,6 +34,9 @@ func main() {
 
 	logger.Info().Str("logger_level", env.loggerLevel).
 		Msg("🫛 Starting PEAS (Path External Auth Server) ...")
+
+	// Create context for graceful shutdown
+	ctx := context.Background()
 
 	// Create a new postgres data source
 	postgresDataSource, err := grove.NewGrovePostgresDriver(
@@ -74,6 +78,15 @@ func main() {
 		panic(err)
 	}
 	logger.Info().Msg("✅ Successfully initialized rate limit store")
+
+	// Setup and start observability servers
+	// TODO_MONITORING: Consider adding graceful shutdown for metrics and pprof servers
+	if err := metrics.ServeMetrics(logger, fmt.Sprintf(":%d", env.metricsPort), env.imageTag); err != nil {
+		panic(fmt.Sprintf("failed to start metrics server: %v", err))
+	}
+
+	// Setup the pprof server
+	metrics.ServePprof(ctx, logger, fmt.Sprintf(":%d", env.pprofPort))
 
 	// Create a new listener to listen for requests from GUARD
 	listen, err := net.Listen("tcp", fmt.Sprintf(":%d", env.port))

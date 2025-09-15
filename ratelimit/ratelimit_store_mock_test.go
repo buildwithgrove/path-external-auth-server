@@ -17,43 +17,43 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
-// MockaccountRateLimitStore is a mock of accountRateLimitStore interface.
-type MockaccountRateLimitStore struct {
+// MockaccountPortalAppStore is a mock of accountPortalAppStore interface.
+type MockaccountPortalAppStore struct {
 	ctrl     *gomock.Controller
-	recorder *MockaccountRateLimitStoreMockRecorder
+	recorder *MockaccountPortalAppStoreMockRecorder
 	isgomock struct{}
 }
 
-// MockaccountRateLimitStoreMockRecorder is the mock recorder for MockaccountRateLimitStore.
-type MockaccountRateLimitStoreMockRecorder struct {
-	mock *MockaccountRateLimitStore
+// MockaccountPortalAppStoreMockRecorder is the mock recorder for MockaccountPortalAppStore.
+type MockaccountPortalAppStoreMockRecorder struct {
+	mock *MockaccountPortalAppStore
 }
 
-// NewMockaccountRateLimitStore creates a new mock instance.
-func NewMockaccountRateLimitStore(ctrl *gomock.Controller) *MockaccountRateLimitStore {
-	mock := &MockaccountRateLimitStore{ctrl: ctrl}
-	mock.recorder = &MockaccountRateLimitStoreMockRecorder{mock}
+// NewMockaccountPortalAppStore creates a new mock instance.
+func NewMockaccountPortalAppStore(ctrl *gomock.Controller) *MockaccountPortalAppStore {
+	mock := &MockaccountPortalAppStore{ctrl: ctrl}
+	mock.recorder = &MockaccountPortalAppStoreMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockaccountRateLimitStore) EXPECT() *MockaccountRateLimitStoreMockRecorder {
+func (m *MockaccountPortalAppStore) EXPECT() *MockaccountPortalAppStoreMockRecorder {
 	return m.recorder
 }
 
-// GetAccountRateLimit mocks base method.
-func (m *MockaccountRateLimitStore) GetAccountRateLimit(accountID store.AccountID) (store.RateLimit, bool) {
+// GetAccountPortalApp mocks base method.
+func (m *MockaccountPortalAppStore) GetAccountPortalApp(accountID store.AccountID) (*store.PortalApp, bool) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetAccountRateLimit", accountID)
-	ret0, _ := ret[0].(store.RateLimit)
+	ret := m.ctrl.Call(m, "GetAccountPortalApp", accountID)
+	ret0, _ := ret[0].(*store.PortalApp)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }
 
-// GetAccountRateLimit indicates an expected call of GetAccountRateLimit.
-func (mr *MockaccountRateLimitStoreMockRecorder) GetAccountRateLimit(accountID any) *gomock.Call {
+// GetAccountPortalApp indicates an expected call of GetAccountPortalApp.
+func (mr *MockaccountPortalAppStoreMockRecorder) GetAccountPortalApp(accountID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAccountRateLimit", reflect.TypeOf((*MockaccountRateLimitStore)(nil).GetAccountRateLimit), accountID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAccountPortalApp", reflect.TypeOf((*MockaccountPortalAppStore)(nil).GetAccountPortalApp), accountID)
 }
 
 // MockdataWarehouseDriver is a mock of dataWarehouseDriver interface.

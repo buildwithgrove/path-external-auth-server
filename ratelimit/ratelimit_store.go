@@ -8,6 +8,7 @@ import (
 
 	"github.com/pokt-network/poktroll/pkg/polylog"
 
+	"github.com/buildwithgrove/path-external-auth-server/metrics"
 	grovedb "github.com/buildwithgrove/path-external-auth-server/postgres/grove"
 	"github.com/buildwithgrove/path-external-auth-server/store"
 )
@@ -20,9 +21,9 @@ import (
 // Once PLAN_FREE accounts hit this limit, they are rate limited until the start of the next month.
 const FreeMonthlyRelays = 1_000_000
 
-// accountRateLimitStore interface provides an in-memory store of account rate limits.
-type accountRateLimitStore interface {
-	GetAccountRateLimit(accountID store.AccountID) (store.RateLimit, bool)
+// accountPortalAppStore interface provides an in-memory store of account portal apps.
+type accountPortalAppStore interface {
+	GetAccountPortalApp(accountID store.AccountID) (*store.PortalApp, bool)
 }
 
 // dataWarehouseDriver interface provides a driver for fetching monthly usage data from the data warehouse.
@@ -35,7 +36,7 @@ type rateLimitStore struct {
 	logger polylog.Logger
 
 	dataWarehouseDriver   dataWarehouseDriver
-	accountRateLimitStore accountRateLimitStore
+	accountPortalAppStore accountPortalAppStore
 
 	rateLimitedAccounts   map[store.AccountID]bool
 	rateLimitedAccountsMu sync.RWMutex
@@ -44,13 +45,13 @@ type rateLimitStore struct {
 func NewRateLimitStore(
 	logger polylog.Logger,
 	dataWarehouseDriver dataWarehouseDriver,
-	accountRateLimitStore accountRateLimitStore,
+	accountPortalAppStore accountPortalAppStore,
 	rateLimitUpdateInterval time.Duration,
 ) (*rateLimitStore, error) {
 	rls := &rateLimitStore{
 		logger: logger.With("component", "rate_limit_store"),
 
-		accountRateLimitStore: accountRateLimitStore,
+		accountPortalAppStore: accountPortalAppStore,
 		dataWarehouseDriver:   dataWarehouseDriver,
 
 		rateLimitedAccounts: make(map[store.AccountID]bool),
@@ -61,6 +62,8 @@ func NewRateLimitStore(
 		rls.logger.Error().
 			Err(err).
 			Msg("Failed to perform initial rate limit check")
+		// Set initial metrics to zero if initial check fails
+		rls.updateStoreMetrics(0, 0)
 	}
 
 	// Start the background rate limit monitoring
@@ -73,7 +76,8 @@ func NewRateLimitStore(
 func (rls *rateLimitStore) IsAccountRateLimited(accountID store.AccountID) bool {
 	rls.rateLimitedAccountsMu.RLock()
 	defer rls.rateLimitedAccountsMu.RUnlock()
-	return rls.rateLimitedAccounts[accountID]
+	_, ok := rls.rateLimitedAccounts[accountID]
+	return ok
 }
 
 // startRateLimitMonitoring runs the periodic rate limit check in a background goroutine.
@@ -100,37 +104,56 @@ func (rls *rateLimitStore) updateRateLimitedAccounts() error {
 	rls.logger.Debug().Msg("🔍 Checking account rate limits")
 
 	// Get month-to-date usage for accounts over the threshold
-	usageData, err := rls.dataWarehouseDriver.GetMonthToMomentUsage(
+	accountUsageOverMonthlyRelayLimit, err := rls.dataWarehouseDriver.GetMonthToMomentUsage(
 		context.Background(),
 		FreeMonthlyRelays,
 	)
 	if err != nil {
+		metrics.RecordDataSourceRefreshError(metrics.RateLimitStoreSourceType, metrics.BigqueryErrorType)
 		return fmt.Errorf("failed to get monthly usage data: %w", err)
 	}
 
 	// Build new rate limited accounts map
 	newRateLimitedAccounts := make(map[store.AccountID]bool)
 
-	for accountIDStr, usage := range usageData {
+	for accountIDStr, usage := range accountUsageOverMonthlyRelayLimit {
 		accountID := store.AccountID(accountIDStr)
 
-		// Get the account's rate limit configuration
-		rateLimit, exists := rls.accountRateLimitStore.GetAccountRateLimit(accountID)
+		// Get the account's portal app
+		portalApp, exists := rls.accountPortalAppStore.GetAccountPortalApp(accountID)
 		if !exists {
-			// Skip accounts without rate limit configuration
+			rls.logger.Error().
+				Str("account_id", string(accountID)).
+				Msg("⁉️ SHOULD NEVER HAPPEN: Skipping account without portal app")
 			continue
 		}
+
+		// Get the account's rate limit
+		// Will return 0 if no rate limit is configured
+		rateLimit := rls.getRateLimit(portalApp)
+		if rateLimit == 0 {
+			rls.logger.Debug().
+				Str("account_id", string(accountID)).
+				Str("plan_type", string(portalApp.PlanType)).
+				Msg("✅ Skipping account with no rate limit configured")
+			continue
+		}
+
+		// Update account usage metrics for accounts over monthly limit
+		planType := string(portalApp.PlanType)
+		metrics.UpdateAccountUsage(string(accountID), planType, float64(usage), rateLimit)
 
 		// Check if account should be rate limited based on plan type
 		shouldLimit := rls.shouldLimitAccount(rateLimit, usage)
 		if shouldLimit {
 			newRateLimitedAccounts[accountID] = true
-			rls.logger.Debug().
+			metrics.UpdateRateLimitedAccounts(string(accountID), planType, float64(usage), rateLimit)
+			rls.logger.Info().
 				Str("account_id", string(accountID)).
-				Str("plan_type", string(rateLimit.PlanType)).
+				Str("plan_type", planType).
 				Int64("usage", usage).
-				Int32("monthly_limit", rateLimit.MonthlyUserLimit).
-				Msg("🚫 Account rate limited")
+				Int32("rate_limit", rateLimit).
+				Msg("🤚 Account rate limited")
 		}
 	}
 
@@ -139,9 +162,12 @@ func (rls *rateLimitStore) updateRateLimitedAccounts() error {
 	rls.rateLimitedAccounts = newRateLimitedAccounts
 	rls.rateLimitedAccountsMu.Unlock()
 
+	// Update store size metrics
+	rls.updateStoreMetrics(len(accountUsageOverMonthlyRelayLimit), len(newRateLimitedAccounts))
+
 	updateDuration := time.Since(startTime)
 	rls.logger.Info().
-		Int("total_accounts_checked", len(usageData)).
+		Int("total_accounts_over_monthly_relay_limit", len(accountUsageOverMonthlyRelayLimit)).
 		Int("rate_limited_accounts", len(newRateLimitedAccounts)).
 		Int64("update_duration_ms", updateDuration.Milliseconds()).
 		Msg("✅ Rate limit check completed")
@@ -149,26 +175,41 @@ func (rls *rateLimitStore) updateRateLimitedAccounts() error {
 	return nil
 }
 
-// shouldLimitAccount determines if an account should be rate limited based on its plan and usage.
-func (rls *rateLimitStore) shouldLimitAccount(rateLimit store.RateLimit, usage int64) bool {
-	switch rateLimit.PlanType {
+// getRateLimit gets the rate limit for an account based on its plan type and rate limit configuration.
+func (rls *rateLimitStore) getRateLimit(portalApp *store.PortalApp) int32 {
+	if portalApp.RateLimit == nil {
+		return 0
+	}
+
+	switch portalApp.PlanType {
 	case grovedb.PlanFree_DatabaseType:
-		// For free plan, check against the free tier limit
-		return usage > FreeMonthlyRelays
+		// For free plan, return the free tier limit
+		return FreeMonthlyRelays
 
 	case grovedb.PlanUnlimited_DatabaseType:
 		// For unlimited plan, check against the account's specific monthly limit (if set)
-		if rateLimit.MonthlyUserLimit > 0 {
-			return usage > int64(rateLimit.MonthlyUserLimit)
+		if portalApp.RateLimit.MonthlyUserLimit > 0 {
+			return portalApp.RateLimit.MonthlyUserLimit
 		}
 		// If no limit is set for unlimited plan, don't rate limit
-		return false
+		return 0
 
 	default:
-		// Unknown plan type - don't rate limit by default
-		rls.logger.Warn().
-			Str("plan_type", string(rateLimit.PlanType)).
-			Msg("Unknown plan type encountered")
+		return 0
+	}
+}
+
+// shouldLimitAccount determines if an account should be rate limited based on its rate limit and usage.
+func (rls *rateLimitStore) shouldLimitAccount(rateLimit int32, usage int64) bool {
+	// If rate limit is 0, don't rate limit (unlimited)
+	if rateLimit == 0 {
 		return false
 	}
+	return usage > int64(rateLimit)
+}
+
+// updateStoreMetrics updates the Prometheus metrics for rate limit store sizes.
+func (rls *rateLimitStore) updateStoreMetrics(accountsOverLimit, rateLimitedAccounts int) {
+	metrics.UpdateStoreSize(metrics.AccountsOverMonthlyLimitStoreType, float64(accountsOverLimit))
+	metrics.UpdateStoreSize(metrics.RateLimitedAccountsStoreType, float64(rateLimitedAccounts))
 }

@@ -68,7 +68,7 @@ func Test_GetPortalApp(t *testing.T) {
 
 				// Compare RateLimit if present
 				if test.expectedPortalApp.RateLimit != nil {
-					c.Equal(test.expectedPortalApp.RateLimit.PlanType, portalApp.RateLimit.PlanType)
+					c.Equal(test.expectedPortalApp.PlanType, portalApp.PlanType)
 					c.Equal(test.expectedPortalApp.RateLimit.MonthlyUserLimit, portalApp.RateLimit.MonthlyUserLimit)
 				} else {
 					c.Nil(portalApp.RateLimit)
@@ -128,20 +128,20 @@ func getTestPortalApps() map[PortalAppID]*PortalApp {
 		"portal_app_1_static_key": {
 			ID:        "portal_app_1_static_key",
 			AccountID: "account_1",
+			PlanType:  "PLAN_UNLIMITED",
 			Auth: &Auth{
 				APIKey: "api_key_1",
 			},
 			RateLimit: &RateLimit{
-				PlanType:         "PLAN_UNLIMITED",
 				MonthlyUserLimit: 0,
 			},
 		},
 		"portal_app_2_no_auth": {
 			ID:        "portal_app_2_no_auth",
 			AccountID: "account_2",
+			PlanType:  "PLAN_UNLIMITED",
 			Auth:      nil,
 			RateLimit: &RateLimit{
-				PlanType:         "PLAN_UNLIMITED",
 				MonthlyUserLimit: 0,
 			},
 		},
@@ -154,31 +154,31 @@ func getUpdatedTestPortalApps() map[PortalAppID]*PortalApp {
 		"portal_app_1_static_key": {
 			ID:        "portal_app_1_static_key",
 			AccountID: "account_1",
+			PlanType:  "PLAN_UNLIMITED",
 			Auth: &Auth{
 				APIKey: "updated_api_key_1",
 			},
 			RateLimit: &RateLimit{
-				PlanType:         "PLAN_UNLIMITED",
 				MonthlyUserLimit: 0,
 			},
 		},
 		"portal_app_2_no_auth": {
 			ID:        "portal_app_2_no_auth",
 			AccountID: "account_2",
+			PlanType:  "PLAN_UNLIMITED",
 			Auth:      nil,
 			RateLimit: &RateLimit{
-				PlanType:         "PLAN_UNLIMITED",
 				MonthlyUserLimit: 0,
 			},
 		},
 		"portal_app_3_static_key": {
 			ID:        "portal_app_3_static_key",
 			AccountID: "account_3",
+			PlanType:  "PLAN_UNLIMITED",
 			Auth: &Auth{
 				APIKey: "new_api_key",
 			},
 			RateLimit: &RateLimit{
-				PlanType:         "PLAN_PRO",
 				MonthlyUserLimit: 1000,
 			},
 		},

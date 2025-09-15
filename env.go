@@ -26,10 +26,25 @@ const (
 	portEnv     = "PORT"
 	defaultPort = 10001
 
+	// [OPTIONAL]: Port to run the Prometheus metrics server on.
+	//   - Default: 9090 if not set
+	metricsPortEnv     = "METRICS_PORT"
+	defaultMetricsPort = 9090
+
+	// [OPTIONAL]: Port to run the pprof server on.
+	//   - Default: 6060 if not set
+	pprofPortEnv     = "PPROF_PORT"
+	defaultPprofPort = 6060
+
 	// [OPTIONAL]: Log level for the external auth server.
 	//   - Default: "info" if not set
 	loggerLevelEnv     = "LOGGER_LEVEL"
 	defaultLoggerLevel = "info"
+
+	// [OPTIONAL]: Image tag/version for the application.
+	//   - Default: "development" if not set
+	imageTagEnv     = "IMAGE_TAG"
+	defaultImageTag = "development"
 
 	// [OPTIONAL]: Refresh interval for the portal app store.
 	//   - Default: 30s if not set
@@ -50,10 +65,20 @@ var postgresConnectionStringRegex = regexp.MustCompile(`^postgres(?:ql)?:\/\/[^:
 //   - All fields are private.
 //   - Use gatherEnvVars to load, validate, and hydrate defaults from environment variables.
 type envVars struct {
-	postgresConnectionString      string
-	gcpProjectID                  string
-	port                          int
-	loggerLevel                   string
+	// Database and external service configuration
+	postgresConnectionString string
+	gcpProjectID             string
+
+	// Server port configuration
+	port        int
+	metricsPort int
+	pprofPort   int
+
+	// Application configuration
+	loggerLevel string
+	imageTag    string
+
+	// Store refresh intervals
 	portalAppStoreRefreshInterval time.Duration
 	rateLimitStoreRefreshInterval time.Duration
 }
@@ -78,10 +103,36 @@ func gatherEnvVars() (envVars, error) {
 		e.port = p
 	}
 
+	// Parse metrics port environment variable (if provided)
+	metricsPortStr := os.Getenv(metricsPortEnv)
+	if metricsPortStr != "" {
+		p, err := strconv.Atoi(metricsPortStr)
+		if err != nil {
+			return envVars{}, fmt.Errorf("invalid metrics port format: %v", err)
+		}
+		e.metricsPort = p
+	}
+
+	// Parse pprof port environment variable (if provided)
+	pprofPortStr := os.Getenv(pprofPortEnv)
+	if pprofPortStr != "" {
+		p, err := strconv.Atoi(pprofPortStr)
+		if err != nil {
+			return envVars{}, fmt.Errorf("invalid pprof port format: %v", err)
+		}
+		e.pprofPort = p
+	}
+
 	// Parse log level from environment (if provided)
 	loggerLevel := os.Getenv(loggerLevelEnv)
 	if loggerLevel != "" {
 		e.loggerLevel = loggerLevel
+	}
+
+	// Parse image tag from environment (if provided)
+	imageTag := os.Getenv(imageTagEnv)
+	if imageTag != "" {
+		e.imageTag = imageTag
 	}
 
 	// Parse portal app store refresh interval from environment (if provided)
@@ -143,8 +194,17 @@ func (e *envVars) hydrateDefaults() {
 	if e.port == 0 {
 		e.port = defaultPort
 	}
+	if e.metricsPort == 0 {
+		e.metricsPort = defaultMetricsPort
+	}
+	if e.pprofPort == 0 {
+		e.pprofPort = defaultPprofPort
+	}
 	if e.loggerLevel == "" {
 		e.loggerLevel = defaultLoggerLevel
+	}
+	if e.imageTag == "" {
+		e.imageTag = defaultImageTag
 	}
 	if e.portalAppStoreRefreshInterval == 0 {
 		e.portalAppStoreRefreshInterval = defaultPortalAppStoreRefreshInterval
