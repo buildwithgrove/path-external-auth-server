@@ -105,7 +105,7 @@ func (a *authHandler) Check(
 		metrics.RecordAuthRequest(
 			"", // portalAppID not available yet
 			"", // accountID not available yet
-			metrics.AuthDecisionError,
+			metrics.AuthDecisionDenied,
 			metrics.AuthRequestErrorTypeInvalidRequestHTTPRequestNotFound,
 			time.Since(startTime).Seconds(),
 		)
@@ -118,7 +118,7 @@ func (a *authHandler) Check(
 		metrics.RecordAuthRequest(
 			"", // portalAppID not available yet
 			"", // accountID not available yet
-			metrics.AuthDecisionError,
+			metrics.AuthDecisionDenied,
 			metrics.AuthRequestErrorTypeInvalidRequestPathNotProvided,
 			time.Since(startTime).Seconds(),
 		)
@@ -136,7 +136,7 @@ func (a *authHandler) Check(
 		metrics.RecordAuthRequest(
 			"", // portalAppID not available yet
 			"", // accountID not available yet
-			metrics.AuthDecisionError,
+			metrics.AuthDecisionDenied,
 			metrics.AuthRequestErrorTypeInvalidRequestNoPortalAppID,
 			time.Since(startTime).Seconds(),
 		)

@@ -16,91 +16,25 @@
             },
             "fieldConfig": {
                 "defaults": {
+                    "custom": {
+                        "hideFrom": {
+                            "tooltip": false,
+                            "viz": false,
+                            "legend": false
+                        }
+                    },
                     "color": {
-                        "mode": "palette-classic"
+                        "mode": "fixed",
+                        "fixedColor": "dark-green"
                     },
                     "mappings": [],
-                    "thresholds": {
-                        "mode": "absolute",
-                        "steps": [
-                            {
-                                "color": "green",
-                                "value": null
-                            }
-                        ]
-                    },
                     "unit": "percent"
                 },
-                "overrides": [
-                    {
-                        "matcher": {
-                            "id": "byName",
-                            "options": "Authorized"
-                        },
-                        "properties": [
-                            {
-                                "id": "color",
-                                "value": {
-                                    "mode": "fixed",
-                                    "fixedColor": "dark-green"
-                                }
-                            }
-                        ]
-                    },
-                    {
-                        "matcher": {
-                            "id": "byName",
-                            "options": "Denied"
-                        },
-                        "properties": [
-                            {
-                                "id": "color",
-                                "value": {
-                                    "mode": "fixed",
-                                    "fixedColor": "dark-yellow"
-                                }
-                            }
-                        ]
-                    },
-                    {
-                        "matcher": {
-                            "id": "byName",
-                            "options": "Error"
-                        },
-                        "properties": [
-                            {
-                                "id": "color",
-                                "value": {
-                                    "mode": "thresholds"
-                                }
-                            },
-                            {
-                                "id": "thresholds",
-                                "value": {
-                                    "mode": "absolute",
-                                    "steps": [
-                                        {
-                                            "color": "green",
-                                            "value": null
-                                        },
-                                        {
-                                            "color": "red",
-                                            "value": 1
-                                        }
-                                    ]
-                                }
-                            },
-                            {
-                                "id": "decimals",
-                                "value": 2
-                            }
-                        ]
-                    }
-                ]
+                "overrides": []
             },
             "gridPos": {
                 "h": 4,
-                "w": 8,
+                "w": 4,
                 "x": 0,
                 "y": 0
             },
@@ -114,7 +48,7 @@
                     "fields": ""
                 },
                 "orientation": "auto",
-                "textMode": "auto",
+                "textMode": "value",
                 "colorMode": "value",
                 "graphMode": "none",
                 "justifyMode": "auto"
@@ -126,27 +60,68 @@
                         "type": "prometheus"
                     },
                     "expr": "(sum(rate(peas_auth_requests_total{status=\"authorized\"}[5m])) / sum(rate(peas_auth_requests_total[5m]))) * 100",
-                    "legendFormat": "Authorized",
+                    "legendFormat": "Approved",
                     "refId": "A"
+                }
+            ],
+            "title": "Auth Requests Approved",
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "custom": {
+                        "hideFrom": {
+                            "tooltip": false,
+                            "viz": false,
+                            "legend": false
+                        }
+                    },
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "dark-yellow"
+                    },
+                    "mappings": [],
+                    "unit": "percent"
                 },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 4,
+                "x": 4,
+                "y": 0
+            },
+            "id": 16,
+            "options": {
+                "reduceOptions": {
+                    "values": false,
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": ""
+                },
+                "orientation": "auto",
+                "textMode": "value",
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto"
+            },
+            "pluginVersion": "10.0.0",
+            "targets": [
                 {
                     "datasource": {
                         "type": "prometheus"
                     },
                     "expr": "(sum(rate(peas_auth_requests_total{status=\"denied\"}[5m])) / sum(rate(peas_auth_requests_total[5m]))) * 100",
                     "legendFormat": "Denied",
-                    "refId": "B"
-                },
-                {
-                    "datasource": {
-                        "type": "prometheus"
-                    },
-                    "expr": "(sum(rate(peas_auth_requests_total{status=\"error\"}[5m])) / sum(rate(peas_auth_requests_total[5m]))) * 100",
-                    "legendFormat": "Error",
-                    "refId": "C"
+                    "refId": "A"
                 }
             ],
-            "title": "Authorization Request Distribution",
+            "title": "Auth Requests Denied",
             "type": "stat"
         },
         {
@@ -194,7 +169,7 @@
             "id": 2,
             "options": {
                 "colorMode": "value",
-                "graphMode": "none",
+                "graphMode": "area",
                 "justifyMode": "auto",
                 "orientation": "auto",
                 "reduceOptions": {
@@ -272,7 +247,7 @@
             "id": 3,
             "options": {
                 "colorMode": "value",
-                "graphMode": "none",
+                "graphMode": "area",
                 "justifyMode": "auto",
                 "orientation": "auto",
                 "reduceOptions": {
@@ -1245,14 +1220,19 @@
                     "color": {
                         "mode": "thresholds"
                     },
-                    "custom": {
-                        "align": "auto",
-                        "cellOptions": {
-                            "type": "auto"
-                        },
-                        "inspect": false
-                    },
-                    "mappings": [],
+                    "mappings": [
+                        {
+                            "options": {
+                                "0": {
+                                    "color": "green",
+                                    "index": 0,
+                                    "text": "No Data Source Refresh Errors"
+                                }
+                            },
+                            "type": "value"
+                        }
+                    ],
+                    "noValue": "No Data Source Refresh Errors",
                     "thresholds": {
                         "mode": "absolute",
                         "steps": [
@@ -1262,7 +1242,7 @@
                             },
                             {
                                 "color": "red",
-                                "value": 80
+                                "value": 1
                             }
                         ]
                     },
@@ -1278,16 +1258,18 @@
             },
             "id": 14,
             "options": {
-                "cellHeight": "sm",
-                "footer": {
-                    "countRows": false,
-                    "fields": "",
-                    "reducer": [
-                        "sum"
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
                     ],
-                    "show": false
+                    "fields": "",
+                    "values": false
                 },
-                "showHeader": true
+                "textMode": "auto"
             },
             "pluginVersion": "10.0.0",
             "targets": [
@@ -1295,42 +1277,12 @@
                     "datasource": {
                         "type": "prometheus"
                     },
-                    "expr": "sum by (error_type) (increase(peas_auth_requests_total{status=\"error\"}[5m]))",
-                    "format": "table",
-                    "instant": true,
-                    "legendFormat": "__auto",
+                    "expr": "sum(increase(peas_data_source_refresh_errors_total[5m])) or vector(0)",
                     "refId": "A"
                 }
             ],
-            "title": "Auth Request Errors",
-            "transformations": [
-                {
-                    "id": "organize",
-                    "options": {
-                        "excludeByName": {
-                            "Time": true
-                        },
-                        "indexByName": {},
-                        "renameByName": {
-                            "Value": "Total",
-                            "error_type": "Error Type"
-                        }
-                    }
-                },
-                {
-                    "id": "sortBy",
-                    "options": {
-                        "fields": {},
-                        "sort": [
-                            {
-                                "field": "Total",
-                                "desc": true
-                            }
-                        ]
-                    }
-                }
-            ],
-            "type": "table"
+            "title": "Data Source Refresh Errors",
+            "type": "stat"
         },
         {
             "datasource": {

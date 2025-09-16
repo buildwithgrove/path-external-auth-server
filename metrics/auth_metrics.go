@@ -49,7 +49,6 @@ const (
 	// Auth Decision type constants
 	AuthDecisionAuthorized = "authorized"
 	AuthDecisionDenied     = "denied"
-	AuthDecisionError      = "error"
 
 	// Error type constants for auth requests
 	AuthRequestErrorTypePortalAppNotFound                 = "portal_app_not_found"
