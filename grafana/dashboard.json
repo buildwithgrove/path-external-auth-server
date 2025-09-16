@@ -17,23 +17,15 @@
             "fieldConfig": {
                 "defaults": {
                     "color": {
-                        "mode": "thresholds"
+                        "mode": "palette-classic"
                     },
                     "mappings": [],
                     "thresholds": {
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "red",
-                                "value": null
-                            },
-                            {
-                                "color": "yellow",
-                                "value": 97
-                            },
-                            {
                                 "color": "green",
-                                "value": 99
+                                "value": null
                             }
                         ]
                     },
@@ -42,13 +34,65 @@
                 "overrides": [
                     {
                         "matcher": {
-                            "id": "byType",
-                            "options": "number"
+                            "id": "byName",
+                            "options": "Authorized"
                         },
                         "properties": [
                             {
-                                "id": "custom.fillOpacity",
-                                "value": 20
+                                "id": "color",
+                                "value": {
+                                    "mode": "fixed",
+                                    "fixedColor": "dark-green"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Denied"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "mode": "fixed",
+                                    "fixedColor": "dark-yellow"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Error"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "mode": "thresholds"
+                                }
+                            },
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "color": "green",
+                                            "value": null
+                                        },
+                                        {
+                                            "color": "red",
+                                            "value": 1
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "id": "decimals",
+                                "value": 2
                             }
                         ]
                     }
@@ -62,18 +106,18 @@
             },
             "id": 1,
             "options": {
-                "colorMode": "value",
-                "graphMode": "none",
-                "justifyMode": "auto",
-                "orientation": "auto",
                 "reduceOptions": {
+                    "values": false,
                     "calcs": [
                         "lastNotNull"
                     ],
-                    "fields": "",
-                    "values": false
+                    "fields": ""
                 },
-                "textMode": "auto"
+                "orientation": "auto",
+                "textMode": "auto",
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto"
             },
             "pluginVersion": "10.0.0",
             "targets": [
@@ -81,11 +125,28 @@
                     "datasource": {
                         "type": "prometheus"
                     },
-                    "expr": "(rate(peas_auth_requests_total{status=\"authorized\"}[5m]) / rate(peas_auth_requests_total[5m])) * 100",
+                    "expr": "(sum(rate(peas_auth_requests_total{status=\"authorized\"}[5m])) / sum(rate(peas_auth_requests_total[5m]))) * 100",
+                    "legendFormat": "Authorized",
                     "refId": "A"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus"
+                    },
+                    "expr": "(sum(rate(peas_auth_requests_total{status=\"denied\"}[5m])) / sum(rate(peas_auth_requests_total[5m]))) * 100",
+                    "legendFormat": "Denied",
+                    "refId": "B"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus"
+                    },
+                    "expr": "(sum(rate(peas_auth_requests_total{status=\"error\"}[5m])) / sum(rate(peas_auth_requests_total[5m]))) * 100",
+                    "legendFormat": "Error",
+                    "refId": "C"
                 }
             ],
-            "title": "Authorization Success Rate",
+            "title": "Authorization Request Distribution",
             "type": "stat"
         },
         {
@@ -233,7 +294,7 @@
                     "refId": "A"
                 }
             ],
-            "title": "P95 Latency",
+            "title": "P95 Request Auth Duration",
             "type": "stat"
         },
         {
@@ -295,24 +356,30 @@
                     {
                         "matcher": {
                             "id": "byName",
-                            "options": "Total"
+                            "options": "Authorized"
                         },
                         "properties": [
                             {
-                                "id": "color.fixedColor",
-                                "value": "blue"
+                                "id": "color",
+                                "value": {
+                                    "mode": "fixed",
+                                    "fixedColor": "dark-green"
+                                }
                             }
                         ]
                     },
                     {
                         "matcher": {
                             "id": "byName",
-                            "options": "Authorized"
+                            "options": "Total"
                         },
                         "properties": [
                             {
-                                "id": "color.fixedColor",
-                                "value": "green"
+                                "id": "color",
+                                "value": {
+                                    "mode": "fixed",
+                                    "fixedColor": "dark-blue"
+                                }
                             }
                         ]
                     },
@@ -323,8 +390,11 @@
                         },
                         "properties": [
                             {
-                                "id": "color.fixedColor",
-                                "value": "yellow"
+                                "id": "color",
+                                "value": {
+                                    "mode": "fixed",
+                                    "fixedColor": "dark-yellow"
+                                }
                             }
                         ]
                     },
@@ -335,8 +405,11 @@
                         },
                         "properties": [
                             {
-                                "id": "color.fixedColor",
-                                "value": "red"
+                                "id": "color",
+                                "value": {
+                                    "mode": "fixed",
+                                    "fixedColor": "red"
+                                }
                             }
                         ]
                     }
@@ -393,6 +466,24 @@
                     "expr": "sum(rate(peas_auth_requests_total{status=\"error\"}[5m]))",
                     "legendFormat": "Error",
                     "refId": "D"
+                }
+            ],
+            "seriesOverrides": [
+                {
+                    "alias": "Total",
+                    "color": "blue"
+                },
+                {
+                    "alias": "Authorized",
+                    "color": "green"
+                },
+                {
+                    "alias": "Denied",
+                    "color": "yellow"
+                },
+                {
+                    "alias": "Error",
+                    "color": "red"
                 }
             ],
             "title": "Authorization Request Rate",
@@ -453,7 +544,113 @@
                     },
                     "unit": "reqps"
                 },
-                "overrides": []
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "invalid_request_http_request_not_found"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "mode": "fixed",
+                                    "fixedColor": "purple"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "invalid_request_path_not_provided"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "mode": "fixed",
+                                    "fixedColor": "orange"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "invalid_request_no_portal_app_id"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "mode": "fixed",
+                                    "fixedColor": "light-green"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "internal_error"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "mode": "fixed",
+                                    "fixedColor": "dark-red"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "portal_app_not_found"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "mode": "fixed",
+                                    "fixedColor": "dark-blue"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "rate_limited"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "mode": "fixed",
+                                    "fixedColor": "dark-green"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "unauthorized"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "mode": "fixed",
+                                    "fixedColor": "dark-yellow"
+                                }
+                            }
+                        ]
+                    }
+                ]
             },
             "gridPos": {
                 "h": 8,
@@ -484,7 +681,7 @@
                     "refId": "A"
                 }
             ],
-            "title": "Rejected Request Reasons",
+            "title": "Denied Request Reasons",
             "type": "timeseries"
         },
         {
@@ -566,7 +763,7 @@
                     "refId": "A"
                 }
             ],
-            "title": "Error Types",
+            "title": "Denied Request Reasons",
             "transformations": [
                 {
                     "id": "organize",
@@ -577,8 +774,20 @@
                         "indexByName": {},
                         "renameByName": {
                             "Value": "Total",
-                            "error_type": "Error Type"
+                            "error_type": "Denied Request Reason"
                         }
+                    }
+                },
+                {
+                    "id": "sortBy",
+                    "options": {
+                        "fields": {},
+                        "sort": [
+                            {
+                                "field": "Total",
+                                "desc": true
+                            }
+                        ]
                     }
                 }
             ],
@@ -678,6 +887,18 @@
                             "plan_type": "Plan Type"
                         }
                     }
+                },
+                {
+                    "id": "sortBy",
+                    "options": {
+                        "fields": {},
+                        "sort": [
+                            {
+                                "field": "Total",
+                                "desc": true
+                            }
+                        ]
+                    }
                 }
             ],
             "type": "table"
@@ -732,7 +953,7 @@
                     "datasource": {
                         "type": "prometheus"
                     },
-                    "expr": "peas_store_size_total{store_type=\"portal_apps\"}",
+                    "expr": "max(peas_store_size_total{store_type=\"portal_apps\"})",
                     "refId": "A"
                 }
             ],
@@ -789,7 +1010,7 @@
                     "datasource": {
                         "type": "prometheus"
                     },
-                    "expr": "peas_store_size_total{store_type=\"accounts\"}",
+                    "expr": "max(peas_store_size_total{store_type=\"accounts\"})",
                     "refId": "A"
                 }
             ],
@@ -846,7 +1067,7 @@
                     "datasource": {
                         "type": "prometheus"
                     },
-                    "expr": "peas_store_size_total{store_type=\"rate_limited_accounts\"}",
+                    "expr": "max(peas_store_size_total{store_type=\"rate_limited_accounts\"})",
                     "refId": "A"
                 }
             ],
@@ -903,7 +1124,7 @@
                     "datasource": {
                         "type": "prometheus"
                     },
-                    "expr": "peas_store_size_total{store_type=\"accounts_over_monthly_limit\"}",
+                    "expr": "max(peas_store_size_total{store_type=\"accounts_over_monthly_limit\"})",
                     "refId": "A"
                 }
             ],
@@ -980,14 +1201,23 @@
                             "Time": true,
                             "__name__": true,
                             "instance": true,
-                            "job": true
+                            "job": true,
+                            "cluster": true,
+                            "container": true,
+                            "endpoint": true,
+                            "namespace": true,
+                            "pod": true,
+                            "service": true,
+                            "monthly_usage": true,
+                            "cluster_name": true,
+                            "prometheus": true
                         },
                         "indexByName": {},
                         "renameByName": {
                             "Value": "Monthly Usage",
                             "account_id": "Account ID",
                             "plan_type": "Plan Type",
-                            "rate_limit": "Rate Limit"
+                            "rate_limit": "Monthly Allowed Relays"
                         }
                     }
                 },
@@ -1013,37 +1243,14 @@
             "fieldConfig": {
                 "defaults": {
                     "color": {
-                        "mode": "palette-classic"
+                        "mode": "thresholds"
                     },
                     "custom": {
-                        "axisCenteredZero": false,
-                        "axisColorMode": "text",
-                        "axisLabel": "",
-                        "axisPlacement": "auto",
-                        "barAlignment": 0,
-                        "drawStyle": "line",
-                        "fillOpacity": 10,
-                        "gradientMode": "none",
-                        "hideFrom": {
-                            "legend": false,
-                            "tooltip": false,
-                            "vis": false
+                        "align": "auto",
+                        "cellOptions": {
+                            "type": "auto"
                         },
-                        "lineInterpolation": "linear",
-                        "lineWidth": 1,
-                        "pointSize": 5,
-                        "scaleDistribution": {
-                            "type": "linear"
-                        },
-                        "showPoints": "never",
-                        "spanNulls": false,
-                        "stacking": {
-                            "group": "A",
-                            "mode": "none"
-                        },
-                        "thresholdsStyle": {
-                            "mode": "off"
-                        }
+                        "inspect": false
                     },
                     "mappings": [],
                     "thresholds": {
@@ -1052,6 +1259,10 @@
                             {
                                 "color": "green",
                                 "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
                             }
                         ]
                     },
@@ -1067,29 +1278,59 @@
             },
             "id": 14,
             "options": {
-                "legend": {
-                    "calcs": [],
-                    "displayMode": "list",
-                    "placement": "bottom",
-                    "showLegend": true
+                "cellHeight": "sm",
+                "footer": {
+                    "countRows": false,
+                    "fields": "",
+                    "reducer": [
+                        "sum"
+                    ],
+                    "show": false
                 },
-                "tooltip": {
-                    "mode": "single",
-                    "sort": "none"
-                }
+                "showHeader": true
             },
+            "pluginVersion": "10.0.0",
             "targets": [
                 {
                     "datasource": {
                         "type": "prometheus"
                     },
-                    "expr": "sum by (source_type, error_type) (rate(peas_data_source_refresh_errors_total[5m]))",
-                    "legendFormat": "{{source_type}} - {{error_type}}",
+                    "expr": "sum by (error_type) (increase(peas_auth_requests_total{status=\"error\"}[5m]))",
+                    "format": "table",
+                    "instant": true,
+                    "legendFormat": "__auto",
                     "refId": "A"
                 }
             ],
-            "title": "Data Source Refresh Errors",
-            "type": "timeseries"
+            "title": "Auth Request Errors",
+            "transformations": [
+                {
+                    "id": "organize",
+                    "options": {
+                        "excludeByName": {
+                            "Time": true
+                        },
+                        "indexByName": {},
+                        "renameByName": {
+                            "Value": "Total",
+                            "error_type": "Error Type"
+                        }
+                    }
+                },
+                {
+                    "id": "sortBy",
+                    "options": {
+                        "fields": {},
+                        "sort": [
+                            {
+                                "field": "Total",
+                                "desc": true
+                            }
+                        ]
+                    }
+                }
+            ],
+            "type": "table"
         },
         {
             "datasource": {
@@ -1161,14 +1402,23 @@
                             "Time": true,
                             "__name__": true,
                             "instance": true,
-                            "job": true
+                            "job": true,
+                            "cluster": true,
+                            "container": true,
+                            "endpoint": true,
+                            "namespace": true,
+                            "pod": true,
+                            "service": true,
+                            "monthly_usage": true,
+                            "cluster_name": true,
+                            "prometheus": true
                         },
                         "indexByName": {},
                         "renameByName": {
                             "Value": "Monthly Usage",
                             "account_id": "Account ID",
                             "plan_type": "Plan Type",
-                            "rate_limit": "Rate Limit"
+                            "rate_limit": "Monthly Allowed Relays"
                         }
                     }
                 },

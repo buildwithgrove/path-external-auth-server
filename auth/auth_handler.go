@@ -105,8 +105,8 @@ func (a *authHandler) Check(
 		metrics.RecordAuthRequest(
 			"", // portalAppID not available yet
 			"", // accountID not available yet
-			"error",
-			"invalid_request",
+			metrics.AuthDecisionError,
+			metrics.AuthRequestErrorTypeInvalidRequestHTTPRequestNotFound,
 			time.Since(startTime).Seconds(),
 		)
 		return getDeniedCheckResponse("HTTP request not found", envoy_type.StatusCode_BadRequest), nil
@@ -118,8 +118,8 @@ func (a *authHandler) Check(
 		metrics.RecordAuthRequest(
 			"", // portalAppID not available yet
 			"", // accountID not available yet
-			"error",
-			"invalid_request",
+			metrics.AuthDecisionError,
+			metrics.AuthRequestErrorTypeInvalidRequestPathNotProvided,
 			time.Since(startTime).Seconds(),
 		)
 		return getDeniedCheckResponse("path not provided", envoy_type.StatusCode_BadRequest), nil
@@ -136,8 +136,8 @@ func (a *authHandler) Check(
 		metrics.RecordAuthRequest(
 			"", // portalAppID not available yet
 			"", // accountID not available yet
-			"error",
-			"invalid_request",
+			metrics.AuthDecisionError,
+			metrics.AuthRequestErrorTypeInvalidRequestNoPortalAppID,
 			time.Since(startTime).Seconds(),
 		)
 		return getDeniedCheckResponse(err.Error(), envoy_type.StatusCode_BadRequest), nil
@@ -154,8 +154,8 @@ func (a *authHandler) Check(
 		metrics.RecordAuthRequest(
 			string(portalAppID),
 			"", // accountID not available yet
-			"denied",
-			"portal_app_not_found",
+			metrics.AuthDecisionDenied,
+			metrics.AuthRequestErrorTypePortalAppNotFound,
 			time.Since(startTime).Seconds(),
 		)
 		return getDeniedCheckResponse("portal app not found", envoy_type.StatusCode_NotFound), nil
@@ -168,8 +168,8 @@ func (a *authHandler) Check(
 		metrics.RecordAuthRequest(
 			string(portalAppID),
 			string(portalApp.AccountID),
-			"denied",
-			"unauthorized",
+			metrics.AuthDecisionDenied,
+			metrics.AuthRequestErrorTypeUnauthorized,
 			time.Since(startTime).Seconds(),
 		)
 		return getDeniedCheckResponse(err.Error(), envoy_type.StatusCode_Unauthorized), nil
@@ -181,8 +181,8 @@ func (a *authHandler) Check(
 		metrics.RecordAuthRequest(
 			string(portalAppID),
 			string(portalApp.AccountID),
-			"denied",
-			"rate_limited",
+			metrics.AuthDecisionDenied,
+			metrics.AuthRequestErrorTypeRateLimited,
 			time.Since(startTime).Seconds(),
 		)
 		return getDeniedCheckResponse(accountRateLimitMessage, envoy_type.StatusCode_TooManyRequests), nil
@@ -196,7 +196,7 @@ func (a *authHandler) Check(
 	metrics.RecordAuthRequest(
 		string(portalAppID),
 		string(portalApp.AccountID),
-		"authorized",
+		metrics.AuthDecisionAuthorized,
 		"",
 		time.Since(startTime).Seconds(),
 	)

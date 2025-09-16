@@ -45,6 +45,20 @@ const (
 	AccountsStoreType                 = "accounts"
 	RateLimitedAccountsStoreType      = "rate_limited_accounts"
 	AccountsOverMonthlyLimitStoreType = "accounts_over_monthly_limit"
+
+	// Auth Decision type constants
+	AuthDecisionAuthorized = "authorized"
+	AuthDecisionDenied     = "denied"
+	AuthDecisionError      = "error"
+
+	// Error type constants for auth requests
+	AuthRequestErrorTypePortalAppNotFound                 = "portal_app_not_found"
+	AuthRequestErrorTypeUnauthorized                      = "unauthorized"
+	AuthRequestErrorTypeRateLimited                       = "rate_limited"
+	AuthRequestErrorTypeInvalidRequestHTTPRequestNotFound = "invalid_request_http_request_not_found"
+	AuthRequestErrorTypeInvalidRequestPathNotProvided     = "invalid_request_path_not_provided"
+	AuthRequestErrorTypeInvalidRequestNoPortalAppID       = "invalid_request_no_portal_app_id"
+	AuthRequestErrorTypeInternalError                     = "internal_error"
 )
 
 func init() {
