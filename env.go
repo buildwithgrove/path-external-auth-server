@@ -13,13 +13,40 @@ import (
 )
 
 const (
+	// [OPTIONAL]: Data source type - "postgres" or "postgrest"
+	//   - Default: "postgres" if not set
+	dataSourceTypeEnv     = "DATA_SOURCE_TYPE"
+	defaultDataSourceType = "postgres"
+
 	// [REQUIRED]: PostgreSQL connection string for the PortalApp database used by the auth server.
 	//   - Example: "postgresql://username:password@localhost:5432/dbname"
 	postgresConnectionStringEnv = "POSTGRES_CONNECTION_STRING"
 
+	// [REQUIRED when DATA_SOURCE_TYPE=postgrest]: PostgREST base URL
+	//   - Example: "http://localhost:3000"
+	postgrestBaseURLEnv = "POSTGREST_BASE_URL"
+
+	// [REQUIRED when DATA_SOURCE_TYPE=postgrest]: JWT secret for PostgREST authentication
+	//   - Example: "supersecretjwtsecretforlocaldevelopment123456789"
+	postgrestJWTSecretEnv = "POSTGREST_JWT_SECRET"
+
+	// [OPTIONAL]: JWT role for PostgREST authentication
+	//   - Examples: "authenticated", "anon"
+	postgrestJWTRoleEnv = "POSTGREST_JWT_ROLE"
+
+	// [REQUIRED when DATA_SOURCE_TYPE=postgrest]: JWT email for PostgREST authentication
+	//   - Example: "service@grove.city"
+	postgrestJWTEmailEnv = "POSTGREST_JWT_EMAIL"
+
 	// [REQUIRED]: GCP project ID for the data warehouse used by the rate limit store.
 	//   - Example: "your-project-id"
 	gcpProjectIDEnv = "GCP_PROJECT_ID"
+
+	// [OPTIONAL]: PostgREST request timeout
+	//   - Default: 30s if not set
+	//   - Examples: "30s", "1m", "2m30s"
+	postgrestTimeoutEnv     = "POSTGREST_TIMEOUT"
+	defaultPostgrestTimeout = 30 * time.Second
 
 	// [OPTIONAL]: Port to run the external auth server on.
 	//   - Default: 10001 if not set
@@ -61,14 +88,31 @@ const (
 
 var postgresConnectionStringRegex = regexp.MustCompile(`^postgres(?:ql)?:\/\/[^:]+:[^@]+@[^:]+:\d+\/[^?]+(?:\?.+)?$`)
 
+// DataSourceType represents the type of data source to use
+type DataSourceType string
+
+const (
+	DataSourceTypePostgres  DataSourceType = "postgres"
+	DataSourceTypePostgREST DataSourceType = "postgrest"
+)
+
 // envVars holds configuration values.
 //   - All fields are private.
 //   - Use gatherEnvVars to load, validate, and hydrate defaults from environment variables.
 type envVars struct {
-	// Database and external service configuration
-	postgresConnectionString string
-	gcpProjectID             string
+	// Database configuration
+	dataSourceType DataSourceType
 
+	postgresConnectionString string
+
+	postgrestBaseURL   string
+	postgrestJWTSecret string
+	postgrestJWTRole   string
+	postgrestJWTEmail  string
+	postgrestTimeout   time.Duration
+
+	// Data warehouse configuration
+	gcpProjectID string
 	// Server port configuration
 	port        int
 	metricsPort int
@@ -87,10 +131,18 @@ type envVars struct {
 //   - Loads configuration from environment variables
 //   - Validates and hydrates defaults for missing/invalid values
 func gatherEnvVars() (envVars, error) {
-	// Initialize with Postgres connection string from environment
+	// Initialize with environment variables
 	e := envVars{
+		dataSourceType: DataSourceType(os.Getenv(dataSourceTypeEnv)),
+
 		postgresConnectionString: os.Getenv(postgresConnectionStringEnv),
-		gcpProjectID:             os.Getenv(gcpProjectIDEnv),
+
+		postgrestBaseURL:   os.Getenv(postgrestBaseURLEnv),
+		postgrestJWTSecret: os.Getenv(postgrestJWTSecretEnv),
+		postgrestJWTRole:   os.Getenv(postgrestJWTRoleEnv),
+		postgrestJWTEmail:  os.Getenv(postgrestJWTEmailEnv),
+
+		gcpProjectID: os.Getenv(gcpProjectIDEnv),
 	}
 
 	// Parse port environment variable (if provided)
@@ -155,6 +207,16 @@ func gatherEnvVars() (envVars, error) {
 		e.rateLimitStoreRefreshInterval = duration
 	}
 
+	// Parse PostgREST timeout from environment (if provided)
+	postgrestTimeoutStr := os.Getenv(postgrestTimeoutEnv)
+	if postgrestTimeoutStr != "" {
+		duration, err := time.ParseDuration(postgrestTimeoutStr)
+		if err != nil {
+			return envVars{}, fmt.Errorf("invalid PostgREST timeout format: %v", err)
+		}
+		e.postgrestTimeout = duration
+	}
+
 	// Apply defaults for any unset configuration
 	e.hydrateDefaults()
 
@@ -167,23 +229,37 @@ func gatherEnvVars() (envVars, error) {
 
 // validate checks that all required environment variables are set and valid
 func (e *envVars) validate() error {
-	// Postgres connection string must be set
-	if e.postgresConnectionString == "" {
-		return fmt.Errorf("%s is not set", postgresConnectionStringEnv)
-	}
-
 	// GCP project ID must be set
 	if e.gcpProjectID == "" {
 		return fmt.Errorf("%s is not set", gcpProjectIDEnv)
 	}
 
-	// Connection string must match expected format
-	matched, err := regexp.MatchString(postgresConnectionStringRegex.String(), e.postgresConnectionString)
-	if err != nil {
-		return fmt.Errorf("failed to validate postgresConnectionString: %v", err)
-	}
-	if !matched {
-		return fmt.Errorf("postgresConnectionString does not match the required pattern")
+	// Validate based on data source type
+	switch e.dataSourceType {
+	case DataSourceTypePostgres:
+		if e.postgresConnectionString == "" {
+			return fmt.Errorf("%s is required when DATA_SOURCE_TYPE=postgres", postgresConnectionStringEnv)
+		}
+		// Connection string must match expected format
+		matched, err := regexp.MatchString(postgresConnectionStringRegex.String(), e.postgresConnectionString)
+		if err != nil {
+			return fmt.Errorf("failed to validate postgresConnectionString: %v", err)
+		}
+		if !matched {
+			return fmt.Errorf("postgresConnectionString does not match the required pattern")
+		}
+	case DataSourceTypePostgREST:
+		if e.postgrestBaseURL == "" {
+			return fmt.Errorf("%s is required when DATA_SOURCE_TYPE=postgrest", postgrestBaseURLEnv)
+		}
+		if e.postgrestJWTSecret == "" {
+			return fmt.Errorf("%s is required when DATA_SOURCE_TYPE=postgrest", postgrestJWTSecretEnv)
+		}
+		if e.postgrestJWTEmail == "" {
+			return fmt.Errorf("%s is required when DATA_SOURCE_TYPE=postgrest", postgrestJWTEmailEnv)
+		}
+	default:
+		return fmt.Errorf("unsupported data source type: %s", e.dataSourceType)
 	}
 
 	return nil
@@ -191,6 +267,12 @@ func (e *envVars) validate() error {
 
 // hydrateDefaults sets defaults for missing/invalid values
 func (e *envVars) hydrateDefaults() {
+	if e.dataSourceType == "" {
+		e.dataSourceType = DataSourceType(defaultDataSourceType)
+	}
+	if e.postgrestTimeout == 0 {
+		e.postgrestTimeout = defaultPostgrestTimeout
+	}
 	if e.port == 0 {
 		e.port = defaultPort
 	}
