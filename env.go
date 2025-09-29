@@ -23,7 +23,7 @@ const (
 	postgresConnectionStringEnv = "POSTGRES_CONNECTION_STRING"
 
 	// [REQUIRED when DATA_SOURCE_TYPE=postgrest]: PostgREST base URL
-	//   - Example: "http://localhost:3000"
+	//   - Example: "https://db.rpc.com/api"
 	postgrestBaseURLEnv = "POSTGREST_BASE_URL"
 
 	// [REQUIRED when DATA_SOURCE_TYPE=postgrest]: JWT secret for PostgREST authentication
@@ -31,11 +31,11 @@ const (
 	postgrestJWTSecretEnv = "POSTGREST_JWT_SECRET"
 
 	// [OPTIONAL]: JWT role for PostgREST authentication
-	//   - Examples: "authenticated", "anon"
+	//   - Examples: "admin"
 	postgrestJWTRoleEnv = "POSTGREST_JWT_ROLE"
 
 	// [REQUIRED when DATA_SOURCE_TYPE=postgrest]: JWT email for PostgREST authentication
-	//   - Example: "service@grove.city"
+	//   - Example: "service@rpc.com"
 	postgrestJWTEmailEnv = "POSTGREST_JWT_EMAIL"
 
 	// [REQUIRED]: GCP project ID for the data warehouse used by the rate limit store.
