@@ -10,6 +10,7 @@ type DataSource interface {
 	// FetchInitialData loads the initial set of portal apps.
 	GetPortalApps() (map[PortalAppID]*PortalApp, error)
 
+	// TODO_TECHDEBT(@commoddity): Remove this method when direct Postgres data source is removed.
 	// Close closes the data source and cleans up any resources.
 	Close()
 }

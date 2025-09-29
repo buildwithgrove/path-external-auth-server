@@ -15,6 +15,7 @@ import (
 	"github.com/buildwithgrove/path-external-auth-server/dwh"
 	"github.com/buildwithgrove/path-external-auth-server/metrics"
 	"github.com/buildwithgrove/path-external-auth-server/postgres/grove"
+	"github.com/buildwithgrove/path-external-auth-server/postgrest"
 	"github.com/buildwithgrove/path-external-auth-server/ratelimit"
 	"github.com/buildwithgrove/path-external-auth-server/store"
 )
@@ -38,15 +39,15 @@ func main() {
 	// Create context for graceful shutdown
 	ctx := context.Background()
 
-	// Create a new postgres data source
-	postgresDataSource, err := grove.NewGrovePostgresDriver(
-		logger, env.postgresConnectionString,
-	)
+	// Create data source based on configuration
+	dataSource, err := createDataSource(env, logger)
 	if err != nil {
-		panic(fmt.Sprintf("failed to connect to postgres: %v", err))
+		panic(fmt.Sprintf("failed to create data source: %v", err))
 	}
-	defer postgresDataSource.Close()
-	logger.Info().Msg("🐘 Successfully connected to postgres as a data source")
+	defer dataSource.Close()
+	logger.Info().
+		Str("data_source_type", string(env.dataSourceType)).
+		Msg("✅ Successfully connected to data source")
 
 	// Create a new data warehouse driver
 	dataWarehouseDriver, err := dwh.NewDriver(context.Background(), env.gcpProjectID)
@@ -59,7 +60,7 @@ func main() {
 	// Create a new portal app store
 	portalAppStore, err := store.NewPortalAppStore(
 		logger,
-		postgresDataSource,
+		dataSource,
 		env.portalAppStoreRefreshInterval,
 	)
 	if err != nil {
@@ -133,5 +134,26 @@ func main() {
 
 	if err = grpcServer.Serve(listen); err != nil {
 		panic(err)
+	}
+}
+
+// createDataSource creates the appropriate data source based on the configured type
+func createDataSource(env envVars, logger polylog.Logger) (store.DataSource, error) {
+	switch env.dataSourceType {
+	case DataSourceTypePostgres:
+		logger.Info().Msg("🐘 Creating Postgres data source")
+		return grove.NewGrovePostgresDriver(logger, env.postgresConnectionString)
+	case DataSourceTypePostgREST:
+		logger.Info().Msg("🌐 Creating PostgREST data source")
+		return postgrest.NewPostgRESTDriver(
+			logger,
+			env.postgrestBaseURL,
+			env.postgrestJWTSecret,
+			env.postgrestJWTRole,
+			env.postgrestJWTEmail,
+			env.postgrestTimeout,
+		)
+	default:
+		return nil, fmt.Errorf("unsupported data source type: %s", env.dataSourceType)
 	}
 }
