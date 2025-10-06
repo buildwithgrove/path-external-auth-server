@@ -281,6 +281,12 @@ func UpdateRateLimitedAccounts(
 	}).Set(monthlyUsage)
 }
 
+// ClearRateLimitedAccountMetrics clears all rate limited account metrics.
+// This is used to remove stale metrics when accounts are no longer rate limited.
+func ClearRateLimitedAccountMetrics() {
+	rateLimitedAccountsTotal.Reset()
+}
+
 // RecordDataSourceRefreshError records an error during data source refresh.
 func RecordDataSourceRefreshError(
 	sourceType string,
