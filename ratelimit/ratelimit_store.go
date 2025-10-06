@@ -117,12 +117,20 @@ func (rls *rateLimitStore) updateRateLimitedAccounts() error {
 	newRateLimitedAccounts := make(map[store.AccountID]bool)
 
 	for accountIDStr, usage := range accountUsageOverMonthlyRelayLimit {
+		if accountIDStr == "" {
+			rls.logger.Error().
+				Int64("usage", usage).
+				Msg("⁉️ SHOULD NEVER HAPPEN: Skipping account with empty account ID")
+			continue
+		}
+
 		accountID := store.AccountID(accountIDStr)
 
 		// Get the account's portal app
 		portalApp, exists := rls.accountPortalAppStore.GetAccountPortalApp(accountID)
 		if !exists {
 			rls.logger.Error().
+				Int64("usage", usage).
 				Str("account_id", string(accountID)).
 				Msg("⁉️ SHOULD NEVER HAPPEN: Skipping account without portal app")
 			continue

@@ -133,9 +133,14 @@ func (c *portalAppStore) refreshStore() error {
 		return fmt.Errorf("failed to refresh store data: %w", err)
 	}
 
+	// Capture count for logging without holding lock
+	c.portalAppsMu.RLock()
+	portalAppCount := len(c.portalApps)
+	c.portalAppsMu.RUnlock()
+
 	refreshDuration := time.Since(startTime)
 	c.logger.Debug().
-		Int("portal_app_count", len(c.portalApps)).
+		Int("portal_app_count", portalAppCount).
 		Int64("refresh_duration_ms", refreshDuration.Milliseconds()).
 		Msg("🌿 Successfully refreshed portal apps from data source")
 
@@ -153,17 +158,29 @@ func (c *portalAppStore) setStoreData() error {
 		return fmt.Errorf("failed to get portal apps from data source: %w", err)
 	}
 
+	// Pre-compute the account portal apps map outside of any locks
+	newAccountPortalApps := make(map[AccountID]*PortalApp)
+	for _, portalApp := range portalApps {
+		newAccountPortalApps[portalApp.AccountID] = portalApp
+	}
+
+	// Update both maps atomically with minimal lock duration
+	// Lock order: always acquire portalAppsMu first to prevent deadlock
 	c.portalAppsMu.Lock()
 	c.portalApps = portalApps
 	c.portalAppsMu.Unlock()
 
-	c.setPortalAppsByAccountID(portalApps)
+	c.accountPortalAppsMu.Lock()
+	c.accountPortalApps = newAccountPortalApps
+	c.accountPortalAppsMu.Unlock()
 
 	return nil
 }
 
 // updateStoreMetrics updates the Prometheus metrics for store sizes.
 func (c *portalAppStore) updateStoreMetrics() {
+	// Capture both counts with minimal lock duration
+	// Lock order: always acquire portalAppsMu first to prevent deadlock
 	c.portalAppsMu.RLock()
 	portalAppCount := len(c.portalApps)
 	c.portalAppsMu.RUnlock()
@@ -172,23 +189,7 @@ func (c *portalAppStore) updateStoreMetrics() {
 	accountCount := len(c.accountPortalApps)
 	c.accountPortalAppsMu.RUnlock()
 
-	// Update store size metrics
+	// Update store size metrics outside of locks
 	metrics.UpdateStoreSize(metrics.PortalAppsStoreType, float64(portalAppCount))
 	metrics.UpdateStoreSize(metrics.AccountsStoreType, float64(accountCount))
-}
-
-// setPortalAppsByAccountID stores portal apps by account ID.
-// This i required because rate limits are applied at the account level, not the portal app level.
-//
-// Only sets account data if it's not already set for the same account ID to avoid unnecessary updates.
-func (c *portalAppStore) setPortalAppsByAccountID(portalApps map[PortalAppID]*PortalApp) {
-	c.accountPortalAppsMu.Lock()
-	defer c.accountPortalAppsMu.Unlock()
-
-	for _, portalApp := range portalApps {
-		// Only set if not already present for this account ID
-		if _, exists := c.accountPortalApps[portalApp.AccountID]; !exists {
-			c.accountPortalApps[portalApp.AccountID] = portalApp
-		}
-	}
 }
