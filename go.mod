@@ -2,13 +2,11 @@ module github.com/buildwithgrove/path-external-auth-server
 
 go 1.24
 
-// TODO_IN_THIS_PR: Update to published version when Portal DB SDK is released
-replace github.com/grove/path/portal-db/sdk/go => ../path/portal-db/sdk/go
-
 require (
 	cloud.google.com/go/bigquery v1.69.0
+	// TODO_NEXT(@commoddity): Update to concrete version tag when PATH PostgREST client SDK is released
+	github.com/buildwithgrove/path/portal-db/sdk/go v0.0.0-20251006170518-7fd85f003655
 	github.com/envoyproxy/go-control-plane/envoy v1.32.4
-	github.com/grove/path/portal-db/sdk/go v0.0.0-00010101000000-000000000000
 	github.com/jackc/pgx/v5 v5.7.4
 	github.com/joho/godotenv v1.5.1
 	github.com/ory/dockertest/v3 v3.12.0

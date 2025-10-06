@@ -1,8 +1,9 @@
 package postgrest
 
 import (
+	portal_db_sdk "github.com/buildwithgrove/path/portal-db/sdk/go"
+
 	"github.com/buildwithgrove/path-external-auth-server/store"
-	portal_db_sdk "github.com/grove/path/portal-db/sdk/go"
 )
 
 const (

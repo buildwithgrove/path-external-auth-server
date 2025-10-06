@@ -11,7 +11,7 @@ import (
 	"github.com/pokt-network/poktroll/pkg/polylog"
 
 	"github.com/buildwithgrove/path-external-auth-server/store"
-	portal_db_sdk "github.com/grove/path/portal-db/sdk/go"
+	portal_db_sdk "github.com/buildwithgrove/path/portal-db/sdk/go"
 )
 
 // PostgRESTDriver implements the store.DataSource interface
