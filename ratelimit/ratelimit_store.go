@@ -113,6 +113,10 @@ func (rls *rateLimitStore) updateRateLimitedAccounts() error {
 		return fmt.Errorf("failed to get monthly usage data: %w", err)
 	}
 
+	// Clear all existing rate limited account metrics to remove stale data
+	// This ensures that accounts no longer rate limited (e.g., at month boundaries) are removed
+	metrics.ClearRateLimitedAccountMetrics()
+
 	// Build new rate limited accounts map
 	newRateLimitedAccounts := make(map[store.AccountID]bool)
 
