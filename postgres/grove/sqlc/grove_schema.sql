@@ -16,7 +16,7 @@
 CREATE TABLE accounts (
     id VARCHAR(10) PRIMARY KEY, -- PortalApp.AccountID
     plan_type VARCHAR(25), -- PortalApp.RateLimit.PlanType
-    monthly_user_limit INT -- PortalApp.RateLimit.MonthlyUserLimit
+    monthly_user_limit BIGINT -- PortalApp.RateLimit.MonthlyUserLimit
 );
 
 -- Portal Application Tables

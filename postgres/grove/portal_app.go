@@ -18,7 +18,7 @@ type portalApplicationRow struct {
 	AccountID         string         `json:"account_id"`          // The PortalApp AccountID maps to the PortalApp.Metadata.AccountId
 	SecretKey         string         `json:"secret_key"`          // The PortalApp SecretKey maps to the PortalApp.Auth.AuthType.StaticApiKey.ApiKey
 	SecretKeyRequired bool           `json:"secret_key_required"` // The PortalApp SecretKeyRequired determines whether the auth type is StaticApiKey or NoAuth
-	MonthlyUserLimit  int32          `json:"monthly_relay_limit"` // The PortalApp MonthlyUserLimit maps to the PortalApp.Metadata.MonthlyUserLimit
+	MonthlyUserLimit  int64          `json:"monthly_relay_limit"` // The PortalApp MonthlyUserLimit maps to the PortalApp.Metadata.MonthlyUserLimit
 	Plan              store.PlanType `json:"plan"`                // The PortalApp Plan maps to the PortalApp.Metadata.PlanType
 }
 
@@ -33,7 +33,7 @@ func sqlcPortalAppsToPortalAppRow(r sqlc.SelectPortalAppsRow) *portalApplication
 		SecretKey:         r.SecretKey.String,
 		SecretKeyRequired: r.SecretKeyRequired.Bool,
 		Plan:              store.PlanType(r.Plan.String),
-		MonthlyUserLimit:  r.MonthlyUserLimit.Int32,
+		MonthlyUserLimit:  r.MonthlyUserLimit.Int64,
 	}
 }
 

@@ -257,12 +257,12 @@ func UpdateAccountUsage(
 	accountID string,
 	planType string,
 	monthlyUsage float64,
-	rateLimit int32,
+	rateLimit int64,
 ) {
 	accountUsageTotal.With(prometheus.Labels{
 		"account_id": accountID,
 		"plan_type":  planType,
-		"rate_limit": strconv.FormatInt(int64(rateLimit), 10),
+		"rate_limit": strconv.FormatInt(rateLimit, 10),
 	}).Set(monthlyUsage)
 }
 
@@ -271,13 +271,13 @@ func UpdateRateLimitedAccounts(
 	accountID string,
 	planType string,
 	monthlyUsage float64,
-	rateLimit int32,
+	rateLimit int64,
 ) {
 	rateLimitedAccountsTotal.With(prometheus.Labels{
 		"account_id":    accountID,
 		"plan_type":     planType,
 		"monthly_usage": fmt.Sprintf("%.2f", monthlyUsage),
-		"rate_limit":    strconv.FormatInt(int64(rateLimit), 10),
+		"rate_limit":    strconv.FormatInt(rateLimit, 10),
 	}).Set(monthlyUsage)
 }
 

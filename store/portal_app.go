@@ -36,7 +36,7 @@ type Auth struct {
 
 // RateLimit contains rate limiting settings for a PortalApp.
 type RateLimit struct {
-	MonthlyUserLimit int32
+	MonthlyUserLimit int64
 }
 
 // PortalAppUpdate represents an update to a portal app in the store

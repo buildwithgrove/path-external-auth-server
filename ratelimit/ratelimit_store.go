@@ -164,7 +164,7 @@ func (rls *rateLimitStore) updateRateLimitedAccounts() error {
 				Str("account_id", string(accountID)).
 				Str("plan_type", planType).
 				Int64("usage", usage).
-				Int32("rate_limit", rateLimit).
+				Int64("rate_limit", rateLimit).
 				Msg("🤚 Account rate limited")
 		}
 	}
@@ -188,7 +188,7 @@ func (rls *rateLimitStore) updateRateLimitedAccounts() error {
 }
 
 // getRateLimit gets the rate limit for an account based on its plan type and rate limit configuration.
-func (rls *rateLimitStore) getRateLimit(portalApp *store.PortalApp) int32 {
+func (rls *rateLimitStore) getRateLimit(portalApp *store.PortalApp) int64 {
 	if portalApp.RateLimit == nil {
 		return 0
 	}
@@ -212,12 +212,12 @@ func (rls *rateLimitStore) getRateLimit(portalApp *store.PortalApp) int32 {
 }
 
 // shouldLimitAccount determines if an account should be rate limited based on its rate limit and usage.
-func (rls *rateLimitStore) shouldLimitAccount(rateLimit int32, usage int64) bool {
+func (rls *rateLimitStore) shouldLimitAccount(rateLimit int64, usage int64) bool {
 	// If rate limit is 0, don't rate limit (unlimited)
 	if rateLimit == 0 {
 		return false
 	}
-	return usage > int64(rateLimit)
+	return usage > rateLimit
 }
 
 // updateStoreMetrics updates the Prometheus metrics for rate limit store sizes.

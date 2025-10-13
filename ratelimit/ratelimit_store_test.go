@@ -304,7 +304,7 @@ func TestUpdateRateLimitedAccounts(t *testing.T) {
 func TestShouldLimitAccount(t *testing.T) {
 	tests := []struct {
 		name           string
-		rateLimit      int32
+		rateLimit      int64
 		usage          int64
 		expectedResult bool
 	}{
@@ -352,7 +352,7 @@ func TestGetRateLimit(t *testing.T) {
 	tests := []struct {
 		name              string
 		portalApp         *store.PortalApp
-		expectedRateLimit int32
+		expectedRateLimit int64
 	}{
 		{
 			name: "should return free tier limit for free plan",
