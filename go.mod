@@ -4,8 +4,7 @@ go 1.24
 
 require (
 	cloud.google.com/go/bigquery v1.69.0
-	// TODO_NEXT(@commoddity): Update to concrete version tag when PATH PostgREST client SDK is released
-	github.com/buildwithgrove/path/portal-db/sdk/go v0.0.0-20251006170518-7fd85f003655
+	github.com/buildwithgrove/path/portal-db/sdk/go v0.4.7
 	github.com/envoyproxy/go-control-plane/envoy v1.32.4
 	github.com/jackc/pgx/v5 v5.7.4
 	github.com/joho/godotenv v1.5.1
