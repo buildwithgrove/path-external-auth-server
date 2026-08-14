@@ -20,6 +20,9 @@
 - [Portal App Store Refresh](#portal-app-store-refresh)
   - [How does Portal App Store Refresh Work?](#how-does-portal-app-store-refresh-work)
   - [Configuration](#configuration)
+- [PostgREST Data Source](#postgrest-data-source)
+  - [PostgREST Configuration](#postgrest-configuration)
+  - [JWT Authentication](#jwt-authentication)
 - [Envoy Gateway Integration](#envoy-gateway-integration)
 - [Prometheus Metrics](#prometheus-metrics)
   - [Key Metrics](#key-metrics)
@@ -120,8 +123,8 @@ PEAS adds the following headers to authorized requests before forwarding them to
 
 | Header                  | Contents                                       | Included For All Requests | Example Value |
 | ----------------------- | ---------------------------------------------- | ------------------------- | ------------- |
-| `Portal-Application-ID` | The portal app ID of the authorized portal app | ✅                        | "a12b3c4d"    |
-| `Portal-Account-ID`     | The account ID associated with the portal app  | ✅                        | "3f4g2js2"    |
+| `Portal-Application-ID` | The portal app ID of the authorized portal app | ✅                         | "a12b3c4d"    |
+| `Portal-Account-ID`     | The account ID associated with the portal app  | ✅                         | "3f4g2js2"    |
 
 ## Rate Limiting Implementation
 
@@ -163,6 +166,44 @@ The refresh interval is configurable via the `REFRESH_INTERVAL` environment vari
 - **Default**: 30 seconds
 - **Format**: Duration string (e.g., `30s`, `1m`, `2m30s`)
 - **Purpose**: Balance between data freshness and database load
+
+## PostgREST Data Source
+
+PEAS supports [PostgREST](https://docs.postgrest.org/en/v13/) as an alternative data source to direct PostgreSQL connections. PostgREST provides a RESTful API layer over PostgreSQL databases, enabling PEAS to fetch portal application and account data via HTTP rather than direct database connections.
+
+For more information about PostgREST configuration and usage, see the [official PostgREST documentation](https://docs.postgrest.org/en/v13/).
+
+<div align="center">
+  <a href="https://docs.postgrest.org/en/v13/">
+    <img src="https://github.com/PostgREST/postgrest/blob/main/static/logo.png?raw=true" alt="PostgREST logo" width="200"/>
+  </a>
+</div>
+
+### PostgREST Configuration
+
+To use PostgREST as the data source, configure the following environment variables:
+
+```bash
+# Set data source type to PostgREST
+DATA_SOURCE_TYPE="postgrest"
+
+# PostgREST API endpoint
+POSTGREST_BASE_URL="https://db.rpc.com/api"
+
+# JWT authentication (required for PostgREST access)
+POSTGREST_JWT_SECRET="supersecretjwtsecretforlocaldevelopment123456789"
+POSTGREST_JWT_EMAIL="service@rpc.com"
+POSTGREST_JWT_ROLE="admin"
+
+# Request timeout (optional)
+POSTGREST_TIMEOUT="30s"  # Optional, defaults to 30s
+```
+
+### JWT Authentication
+
+PEAS generates fresh JWT tokens for each PostgREST API request using the configured secret, email, and role. 
+
+This ensures secure access to the PostgREST API with proper authentication and authorization based on your [PostgREST JWT configuration](https://docs.postgrest.org/en/v13/references/auth.html).
 
 ## Envoy Gateway Integration
 
@@ -285,17 +326,27 @@ This tool uses gRPC reflection to communicate with PEAS, testing the same author
 
 PEAS is configured via environment variables.
 
-| Variable                          | Required | Type     | Description                                                  | Example                                              | Default Value |
-| --------------------------------- | -------- | -------- | ------------------------------------------------------------ | ---------------------------------------------------- | ------------- |
-| POSTGRES_CONNECTION_STRING        | ✅       | string   | PostgreSQL connection string for the PortalApp database      | postgresql://username:password@localhost:5432/dbname | -             |
-| GCP_PROJECT_ID                    | ✅       | string   | GCP project ID for the data warehouse used by rate limiting  | your-project-id                                      | -             |
-| PORT                              | ❌       | int      | Port to run the external auth server on                      | 10001                                                | 10001         |
-| METRICS_PORT                      | ❌       | int      | Port to run the Prometheus metrics server on                 | 9090                                                 | 9090          |
-| PPROF_PORT                        | ❌       | int      | Port to run the pprof server on                              | 6060                                                 | 6060          |
-| LOGGER_LEVEL                      | ❌       | string   | Log level for the external auth server                       | info, debug, warn, error                             | info          |
-| IMAGE_TAG                         | ❌       | string   | Image tag/version for the application                        | v1.0.0                                               | development   |
-| PORTAL_APP_STORE_REFRESH_INTERVAL | ❌       | duration | Refresh interval for portal app data from the database       | 30s, 1m, 2m30s                                       | 30s           |
-| RATE_LIMIT_STORE_REFRESH_INTERVAL | ❌       | duration | Refresh interval for rate limit data from the data warehouse | 30s, 1m, 2m30s                                       | 5m            |
+| Variable                          | Required | Type     | Description                                                                        | Example                                              | Default Value |
+| --------------------------------- | -------- | -------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------- | ------------- |
+| **Data Source Configuration**     |          |          |                                                                                    |                                                      |               |
+| DATA_SOURCE_TYPE                  | ❌        | string   | Data source type: "postgres" or "postgrest"                                        | postgres, postgrest                                  | postgres      |
+| POSTGRES_CONNECTION_STRING        | ✅*       | string   | PostgreSQL connection string (required when DATA_SOURCE_TYPE=postgres)             | postgresql://username:password@localhost:5432/dbname | -             |
+| POSTGREST_BASE_URL                | ✅*       | string   | PostgREST API base URL (required when DATA_SOURCE_TYPE=postgrest)                  | https://db.rpc.com/api                               | -             |
+| POSTGREST_JWT_SECRET              | ✅*       | string   | JWT secret for PostgREST authentication (required when DATA_SOURCE_TYPE=postgrest) | supersecretjwtsecretforlocaldevelopment123456789     | -             |
+| POSTGREST_JWT_EMAIL               | ✅*       | string   | JWT email for PostgREST authentication (required when DATA_SOURCE_TYPE=postgrest)  | service@rpc.com                                      | -             |
+| POSTGREST_JWT_ROLE                | ❌        | string   | JWT role for PostgREST authentication                                              | admin                                                | -             |
+| POSTGREST_TIMEOUT                 | ❌        | duration | PostgREST request timeout                                                          | 30s, 1m, 2m30s                                       | 30s           |
+| **System Configuration**          |          |          |                                                                                    |                                                      |               |
+| GCP_PROJECT_ID                    | ✅        | string   | GCP project ID for the data warehouse used by rate limiting                        | your-project-id                                      | -             |
+| PORT                              | ❌        | int      | Port to run the external auth server on                                            | 10001                                                | 10001         |
+| METRICS_PORT                      | ❌        | int      | Port to run the Prometheus metrics server on                                       | 9090                                                 | 9090          |
+| PPROF_PORT                        | ❌        | int      | Port to run the pprof server on                                                    | 6060                                                 | 6060          |
+| LOGGER_LEVEL                      | ❌        | string   | Log level for the external auth server                                             | info, debug, warn, error                             | info          |
+| IMAGE_TAG                         | ❌        | string   | Image tag/version for the application                                              | v1.0.0                                               | development   |
+| PORTAL_APP_STORE_REFRESH_INTERVAL | ❌        | duration | Refresh interval for portal app data from the database                             | 30s, 1m, 2m30s                                       | 30s           |
+| RATE_LIMIT_STORE_REFRESH_INTERVAL | ❌        | duration | Refresh interval for rate limit data from the data warehouse                       | 30s, 1m, 2m30s                                       | 5m            |
+
+**\* Required when the corresponding DATA_SOURCE_TYPE is selected**
 
 ## Developing Metrics Dashboard Locally
 
@@ -329,9 +380,9 @@ This section describes how to run and test the PEAS metrics dashboard locally us
    - **PEAS Health**: `http://localhost:9090/healthz`
    - **PEAS pprof**: `http://localhost:6060/debug/pprof/`
    - **Prometheus**: `http://localhost:9091`
-   - **Grafana**: `http://localhost:3000` (admin/admin)
+   - **Grafana**: `https://db.rpc.com/api` (admin/admin)
 4. **View the dashboard**:
-   - Go to Grafana at `http://localhost:3000`
+   - Go to Grafana at `https://db.rpc.com/api`
    - Login with admin/admin
    - The PEAS dashboard should be automatically loaded
 

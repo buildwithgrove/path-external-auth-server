@@ -164,5 +164,5 @@ echo "✅ Successful: $successful_count"
 echo "❌ Failed auth: $failed_count"
 echo "⚠️  Errors: $error_count"
 echo
-echo -e "${YELLOW}📊 Check your Grafana dashboard at http://localhost:3000${NC}"
+echo -e "${YELLOW}📊 Check your Grafana dashboard at https://db.rpc.com/api${NC}"
 echo -e "${YELLOW}📈 Check metrics at http://localhost:9090/metrics${NC}"
